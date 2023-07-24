@@ -10,6 +10,8 @@ import shapes
 import figure_eight
 import barcodePlotting
 
+import time
+
 class Ellipsoid:
     def __init__(self, center, axes, axesLengths):
         self.center = center
@@ -205,6 +207,7 @@ def plotDataPoints(points, axes=None):
         axes.scatter(points[:,0],points[:,1])
 
 def main():
+    tStart = time.time()    # for testing performace
 
     dim = 2                 # dimension of the ambient space
     r = 0                   # filtration parameter (if set to zero, 
@@ -212,14 +215,14 @@ def main():
     rStart = 0.1
     rEnd = 4
     rStep = 0.05
-    rPlot = 0.7            # the value of r at which the simplex tree will be plotted
+    rPlot = 0.6            # the value of r at which the simplex tree will be plotted
     if rPlot not in np.arange(rStart,rEnd,rStep):
         print('Warning: the simplex tree plot may be inaccurate since the calculations are ' \
               +'not performed for the chosen value of rPlot. To fix this, make sure that ' \
               +'rPlot is in np.arange(rStart,rEnd,rStep).')
-    neighbourhoodSize = 3   # number of points for doing PCA
+    neighbourhoodSize = 5   # number of points for doing PCA
 
-    nPoints = 10            # number of data points
+    nPoints = 100            # number of data points
     points = createData(nPoints,'circle')
     #points = shapes.sample_from_sphere(n=nPoints)
     #points = figure_eight.figure_eight(nPoints, 1, 0.2)
@@ -268,10 +271,15 @@ def main():
     barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
                                              axis_start = -0.1, infinity = rEnd + 0.1)
     axBarR.set_title('Rips barcode', fontsize=12)
+    tEnd = time.time()      # for testing performace
+    print('The total execution time is ' + str(tEnd-tStart))
     plt.show()
 
 if __name__ == "__main__":
+
     main()
+
+
 
     
 
