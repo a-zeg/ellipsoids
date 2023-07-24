@@ -8,6 +8,7 @@ from scipy.optimize import minimize_scalar
 
 import shapes
 import figure_eight
+import barcodePlotting
 
 class Ellipsoid:
     def __init__(self, center, axes, axesLengths):
@@ -209,11 +210,16 @@ def main():
     r = 0                   # filtration parameter (if set to zero, 
                             # calculations will be performed for a range of filtrations)
     rStart = 0.1
-    rEnd = 5
-    rStep = 0.1
+    rEnd = 4
+    rStep = 0.05
+    rPlot = 0.7            # the value of r at which the simplex tree will be plotted
+    if rPlot not in np.arange(rStart,rEnd,rStep):
+        print('Warning: the simplex tree plot may be inaccurate since the calculations are ' \
+              +'not performed for the chosen value of rPlot. To fix this, make sure that ' \
+              +'rPlot is in np.arange(rStart,rEnd,rStep).')
     neighbourhoodSize = 3   # number of points for doing PCA
 
-    nPoints = 20            # number of data points
+    nPoints = 10            # number of data points
     points = createData(nPoints,'circle')
     #points = shapes.sample_from_sphere(n=nPoints)
     #points = figure_eight.figure_eight(nPoints, 1, 0.2)
@@ -245,17 +251,23 @@ def main():
     ripsComplex = gd.RipsComplex(points=points)
     simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
     barcodeRips = simplexTreeRips.persistence()
-    
-    fig, axes = plt.subplots(2,2)#, width_ratios=[1,2]) # width_ratios=[1,1])#gridspec_kw={'height_ratios': [1, 1]})
-    if r == 0: 
-        rPlot = rEnd
-    plotEllipses(ellipseList, rPlot, axes=axes[0,0])
-    plotSimplexTree(points, simplexTree, rPlot, axes=axes[0,0])
-    axes[0,0].set_title('Data and the ellipsoid simplex tree for r = %0.2f' %(rPlot), fontsize=12)
-    gd.plot_persistence_barcode(barcode, inf_delta=0.5, axes=axes[0,1], fontsize=12)
-    axes[0,1].set_title('Ellipsoid barcode', fontsize=12)
-    gd.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axes[1,1], fontsize=12)
-    axes[1,1].set_title('Rips barcode', fontsize=12)
+
+    fig = plt.figure()
+    gs = fig.add_gridspec(2,2)
+    axData = fig.add_subplot(gs[:, 0])
+    axBarE = fig.add_subplot(gs[0, 1])
+    axBarR = fig.add_subplot(gs[1, 1])
+
+    plotEllipses(ellipseList, rPlot, axes=axData)
+    plotSimplexTree(points, simplexTree, rPlot, axes=axData)
+    axData.set_title('Data and the ellipsoid simplex tree for r = %0.2f' %(rPlot), fontsize=12)
+
+    barcodePlotting.plot_persistence_barcode(barcode, inf_delta=0.5, axes=axBarE, fontsize=12,\
+                                             axis_start = -0.1, infinity = rEnd + 0.1)
+    axBarE.set_title('Ellipsoid barcode', fontsize=12)
+    barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
+                                             axis_start = -0.1, infinity = rEnd + 0.1)
+    axBarR.set_title('Rips barcode', fontsize=12)
     plt.show()
 
 if __name__ == "__main__":
