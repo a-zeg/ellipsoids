@@ -4,7 +4,7 @@ To run the code, run ellipsoids.py. Below is a more detailed description of all 
 
 ## ellipsoids.py
 This is the main file. It:
-- calculates the ellipsoid simplex tree of the data specified in the variable `points` in the function `main()` at the filtration levels specified by 'rValues';
+- calculates the ellipsoid simplex tree of the data specified in the variable `points` in the function `main()` at the filtration levels specified by `rValues`;
 - calculates the Rips simplex tree at the same filtration level;
 - creates a plot containing the initial data, the ellipsoid simplex tree and the ellipses used to create it (both at filtration level `rPlot`), and the corresponding barcodes.
 
