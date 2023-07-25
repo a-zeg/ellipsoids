@@ -10,6 +10,9 @@ import shapes
 import figure_eight
 import barcodePlotting
 
+import json
+from datetime import datetime
+
 import time
 
 class Ellipsoid:
@@ -17,6 +20,10 @@ class Ellipsoid:
         self.center = center
         self.axes = axes
         self.axesLengths = axesLengths
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__, 
+            sort_keys=True, indent=4)
 
 def createData(nPoints, type, variation = 0.1, dim=2):
     ''' Generate point cloud data of type 'type' and consiting of 'nPoints' points.
@@ -66,6 +73,17 @@ def fitEllipsoid(dim, center, neighbourhood):
     axes = pca.components_
     axesLengths = pca.singular_values_
     return Ellipsoid(center, axes, axesLengths)
+
+def fitEllipsoids(dim, kdTree, neighbourhoodSize):
+    points = kdTree.data
+    nPoints = len(points)
+    ellipseList = []
+    for point in points:
+        [NULL,neighbourhoodIdx] = kdTree.query(point, min(nPoints,neighbourhoodSize))
+        neighbourhood = points[neighbourhoodIdx]
+        currentEllipsoid = fitEllipsoid(dim, point, neighbourhood)
+        ellipseList.append(currentEllipsoid)
+    return ellipseList
 
 def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     sampleRate = 100
@@ -119,17 +137,13 @@ def PCAtesting(neighbourhood, ellipse: Ellipsoid):
                ellipse.axes[1,0], ellipse.axes[1,1], \
                scale=5/(ellipse.axesLengths[1]))
 
-def generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, **kwargs):
-    ''' Creates a Simplex Tree from the ellipsoids by adding an edge between each two points whose 
+def generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, filtrationValues):
+    ''' Creates a simplex tree from the ellipsoids by adding an edge between each two points whose 
     corresponding ellipsoids intersect.
-    As **kwargs, one must provide either:
-    1)
-    :filtrationStart: 
-    :filtrationEnd:
-    :filtrationStep:
-    or
-    2)
-    :filtration:
+    :kdTree: KD tree of the initial dataset
+    :ellipsoidList: list of ellipsoids (output of ??)
+    :queryRadius:
+    :filtrationValues:
 
     :return: gudhi.SimplexTree
     '''
@@ -137,34 +151,15 @@ def generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, **kwargs):
     nPoints = len(points)
     simplexTree = gd.SimplexTree()
 
-    if 'filtrationStart' in kwargs and 'filtrationEnd' in kwargs and 'filtrationStep' in kwargs: 
-        filtrationStart = kwargs['filtrationStart']
-        filtrationEnd = kwargs['filtrationEnd']
-        filtrationStep = kwargs['filtrationStep']
-
-        for r in np.arange(filtrationStart, filtrationEnd, filtrationStep):
-            for i in range(nPoints):
-                simplexTree.insert([i], 0)
-                neighboursIdx = kdTree.query_ball_point(points[i], queryRadius, return_sorted=False)
-                if len(neighboursIdx) > 1:
-                    for idx in neighboursIdx:
-                        if (idx != i) and not(simplexTree.find([i,idx])):
-                            if ellipsoidIntersection(ellipsoidList[i], ellipsoidList[idx],r):
-                                simplexTree.insert([i,idx], r)
-
-    elif 'filtration' in kwargs:
-        r = kwargs['filtration']
+    for r in filtrationValues:
         for i in range(nPoints):
             simplexTree.insert([i], 0)
-            neighboursIdx = kdTree.query_ball_point(points[i], 2, return_sorted=False)
+            neighboursIdx = kdTree.query_ball_point(points[i], queryRadius, return_sorted=False)
             if len(neighboursIdx) > 1:
                 for idx in neighboursIdx:
                     if (idx != i) and not(simplexTree.find([i,idx])):
                         if ellipsoidIntersection(ellipsoidList[i], ellipsoidList[idx],r):
                             simplexTree.insert([i,idx], r)
-
-    else:
-        raise Exception("Invalid input argument.")
 
     return simplexTree
 
@@ -200,61 +195,42 @@ def printListOfSimplices(simplexTree):
     for splx in simplexList:
         print(splx)
 
+def maxFiltration(simplexTree):
+    generator = simplexTree.get_filtration()
+    simplexList = list(generator)
+    return max(splx[1] for splx in simplexList)
+
 def plotDataPoints(points, axes=None):
     if axes is None:
         plt.scatter(points[:,0],points[:,1])
     else:
         axes.scatter(points[:,0],points[:,1])
 
-def main():
-    tStart = time.time()    # for testing performace
+###### in progress ######
+def createVarDict(listOfVars):
+    return dict(((k, eval(k)) for k in listOfVars))
 
-    dim = 2                 # dimension of the ambient space
-    r = 0                   # filtration parameter (if set to zero, 
-                            # calculations will be performed for a range of filtrations)
-    rStart = 0.1
-    rEnd = 4
-    rStep = 0.05
-    rPlot = 0.6            # the value of r at which the simplex tree will be plotted
-    if rPlot not in np.arange(rStart,rEnd,rStep):
-        print('Warning: the simplex tree plot may be inaccurate since the calculations are ' \
-              +'not performed for the chosen value of rPlot. To fix this, make sure that ' \
-              +'rPlot is in np.arange(rStart,rEnd,rStep).')
-    neighbourhoodSize = 5   # number of points for doing PCA
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, Ellipsoid):
+            return obj.toJSON()
+        return json.JSONEncoder.default(self, obj)
 
-    nPoints = 100            # number of data points
-    points = createData(nPoints,'circle')
-    #points = shapes.sample_from_sphere(n=nPoints)
-    #points = figure_eight.figure_eight(nPoints, 1, 0.2)
+def writeVarsToFile(filename, dictOfVars):
+    json_string = json.dumps(dictOfVars, cls=NumpyEncoder)
+    print(json_string)
+    with open(filename, 'w') as outfile:
+        outfile.write(json_string)
 
-    kdTree = spatial.KDTree(points)
+def readVarsFromFile(filename):
+    with open(filename) as json_file:
+        varsDict = json.load(json_file)
+    return varsDict
+#########################
 
-    ellipseList = []
-    for point in points:
-        [NULL,neighbourhoodIdx] = kdTree.query(point, min(nPoints,neighbourhoodSize))
-        neighbourhood = points[neighbourhoodIdx]
-        currentEllipsoid = fitEllipsoid(dim, point, neighbourhood)
-        ellipseList.append(currentEllipsoid)
-
-    longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipseList)
-    queryRadius = 2*longestEllipsoidAxis
-        
-    if r > 0: 
-        simplexTree = generateEllipoidSimplexTree(kdTree, ellipseList, queryRadius, \
-                                                  filtration=r)
-    else:
-        simplexTree = generateEllipoidSimplexTree(kdTree, ellipseList, queryRadius, \
-                                                  filtrationStart=rStart, filtrationEnd=rEnd, \
-                                                  filtrationStep=rStep)
-    
-    simplexTree.expansion(dim) # expands the simplicial complex to include 
-                               # dim-dimensional simplices whose 1-skeleton is in simplexTree
-    barcode = simplexTree.persistence()
-
-    ripsComplex = gd.RipsComplex(points=points)
-    simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
-    barcodeRips = simplexTreeRips.persistence()
-
+def visualisation(points, ellipseList, rPlot, simplexTreeEllipsoids, simplexTreeRips, barcodeEllipsoids, barcodeRips):
     fig = plt.figure()
     gs = fig.add_gridspec(2,2)
     axData = fig.add_subplot(gs[:, 0])
@@ -262,21 +238,72 @@ def main():
     axBarR = fig.add_subplot(gs[1, 1])
 
     plotEllipses(ellipseList, rPlot, axes=axData)
-    plotSimplexTree(points, simplexTree, rPlot, axes=axData)
+    plotSimplexTree(points, simplexTreeEllipsoids, rPlot, axes=axData)
     axData.set_title('Data and the ellipsoid simplex tree for r = %0.2f' %(rPlot), fontsize=12)
 
-    barcodePlotting.plot_persistence_barcode(barcode, inf_delta=0.5, axes=axBarE, fontsize=12,\
-                                             axis_start = -0.1, infinity = rEnd + 0.1)
+    barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
+                                             axis_start = -0.1, infinity = maxFiltration(simplexTreeEllipsoids) + 0.1)
     axBarE.set_title('Ellipsoid barcode', fontsize=12)
     barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
-                                             axis_start = -0.1, infinity = rEnd + 0.1)
+                                             axis_start = -0.1, infinity = maxFiltration(simplexTreeRips) + 0.1)
     axBarR.set_title('Rips barcode', fontsize=12)
+    
+    plt.show()
+    
+def main():
+    tStart = time.time()    # for testing performace
+
+    dim = 2                 # dimension of the ambient space
+                            # calculations will be performed for a range of filtrations)
+    rStart = 0.1
+    rEnd = 4
+    rStep = 0.05
+    rValues = np.arange(rStart, rEnd, rStep)
+    
+    rPlot = 0.6             # the value of r at which the simplex tree will be plotted
+    boolPlot = True
+    
+    if rPlot not in rValues:
+        print('Warning: the simplex tree plot may be inaccurate since the calculations are ' \
+              +'not performed for the chosen value of rPlot. To fix this, make sure that ' \
+              +'rPlot is in np.arange(rStart,rEnd,rStep).')
+    neighbourhoodSize = 3   # number of points for doing PCA
+
+    nPoints = 10            # number of data points
+    points = createData(nPoints,'circle')
+    #points = shapes.sample_from_sphere(n=nPoints)
+    #points = figure_eight.figure_eight(nPoints, 1, 0.2)
+
+    kdTree = spatial.KDTree(points)
+
+    ellipseList = fitEllipsoids(dim, kdTree, neighbourhoodSize)
+    longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipseList)
+    queryRadius = 2*longestEllipsoidAxis
+    simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipseList, queryRadius, \
+                                                        filtrationValues = rValues)
+    simplexTreeEllipsoids.expansion(dim) # expands the simplicial complex to include 
+                                         # dim-dimensional simplices whose 1-skeleton is in simplexTree
+    barcodeEllipsoids = simplexTreeEllipsoids.persistence()
+
+    ripsComplex = gd.RipsComplex(points=points)
+    simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
+    barcodeRips = simplexTreeRips.persistence()
+
     tEnd = time.time()      # for testing performace
     print('The total execution time is ' + str(tEnd-tStart))
-    plt.show()
+    
+    if boolPlot is True:
+        visualisation(points, ellipseList, rPlot, simplexTreeEllipsoids, simplexTreeRips, barcodeEllipsoids, barcodeRips)
+    
+    # else:
+    #     filename = datetime.now().strftime("data/ellipsoidsVars_%Y%m%d_%H%M%S.json")
+    #     listOfVars = ['points', 'ellipseList', 'simplexTreeEllipsoids', 'simplexTreeRips', 'barcodeEllipsoids', 'barcodeRips']
+    #     scope = locals()
+    #     dictOfVars = dict(((k, eval(k, scope)) for k in listOfVars))
+    #     writeVarsToFile(filename, dictOfVars)
+
 
 if __name__ == "__main__":
-
     main()
 
 
