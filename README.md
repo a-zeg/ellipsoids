@@ -21,6 +21,10 @@
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
+       <ul>
+        <li><a href="#user-input">User input</a></li>
+        <li><a href="#output">Output</a></li>
+      </ul>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
@@ -55,7 +59,7 @@ Depending on the value of `boolPlotFromFile`, the programme will either:
 2. Calculate barcodes of ellipsoid and Rips complexes from data specified in `points`. 
 
 ## User input
-All the parameters need to be specified within this file, in places marked as follows:
+All the parameters that need to be specified by the user are in `ellipsoids.py`, in places marked as follows:
 ```python
 ###### User input ######
 ...
