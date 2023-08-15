@@ -71,6 +71,10 @@ def createData(nPoints, type, variation = 0.1, dim=2):
         
         output = np.vstack((x,y)).transpose()
 
+    elif type == 'sphere':
+        r = 1
+        
+
     else:
         raise Exception(type + " is an invalid type of data.")
     
@@ -104,6 +108,45 @@ def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     yTemp = r*ellipse.axesLengths[1]*np.sin(t)
     x = ellipse.center[0] + ellipse.axes[0,0]*xTemp + ellipse.axes[1,0]*yTemp
     y = ellipse.center[1] + ellipse.axes[0,1]*xTemp + ellipse.axes[1,1]*yTemp
+    if axes is None:
+        plt.plot(x,y,c=color)
+    else:
+        axes.plot(x,y,c=color)
+
+def plotEllipsoid(ellipsoid: Ellipsoid, color='grey', r=1, axes=None):
+    sampleRate = 100
+
+    rx = ellipsoid.axesLengths[0]
+    ry = ellipsoid.axesLengths[1]
+    rz = ellipsoid.axesLengths[2]
+    
+    # Set of all spherical angles:
+    u = np.linspace(0, 2 * np.pi, sampleRate)
+    v = np.linspace(0, np.pi, sampleRate)
+
+    # Cartesian coordinates that correspond to the spherical angles:
+    # (this is the equation of an ellipsoid):
+    a1 = rx * np.outer(np.cos(u), np.sin(v))
+    a2 = ry * np.outer(np.sin(u), np.sin(v))
+    a3 = rz * np.outer(np.ones_like(u), np.cos(v))
+
+    transformationMatrix = ellipsoid.axes()
+    x = a1*transformationMatrix
+    y = a2*transformationMatrix
+    z = a3*transformationMatrix
+
+
+    # Plot:
+    ax.plot_surface(x, y, z,  rstride=4, cstride=4, color='b')
+
+    # Adjustment of the axes, so that they all have the same span:
+    max_radius = max(rx, ry, rz)
+    for axis in 'xyz':
+        getattr(ax, 'set_{}lim'.format(axis))((-max_radius, max_radius))
+
+    plt.show()
+
+
     if axes is None:
         plt.plot(x,y,c=color)
     else:
@@ -169,7 +212,9 @@ def generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, filtrationVa
             neighboursIdx = kdTree.query_ball_point(points[i], queryRadius, return_sorted=False)
             if len(neighboursIdx) > 1:
                 for idx in neighboursIdx:
+                    #debug:print(f'{i=}' + ' ' f'{idx}')
                     if (idx != i) and not(simplexTree.find([i,idx])):
+                        #debug:print(f'{ellipsoidList[i].axes=}' + '; ' + f'{ellipsoidList[idx].axes=}')
                         if ellipsoidIntersection(ellipsoidList[i], ellipsoidList[idx],r):
                             simplexTree.insert([i,idx], r)
 
@@ -220,6 +265,7 @@ def plotDataPoints(points, axes=None):
 
 class CustomEncoder(json.JSONEncoder):
     def default(self, obj):
+        print(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         elif isinstance(obj, Ellipsoid):
@@ -233,10 +279,18 @@ class CustomEncoder(json.JSONEncoder):
             return list(obj.get_filtration())
         return json.JSONEncoder.default(self, obj)
     
-def saveVarsToFile(points, ellipseList, simplexTreeEllipsoids, \
+def saveVarsToFile(dim, rStart, rEnd, rStep, rValues, nbhdSize, nPts, points, ellipseList, simplexTreeEllipsoids, \
                 simplexTreeRips, barcodeEllipsoids, barcodeRips, \
                 filename=datetime.now().strftime("data/test.json")):
+    print('Saving data to file...')
     dictOfVars = {
+        'dim': dim,
+        'rStart': rStart,
+        'rEnd': rEnd,
+        'rStep': rStep,
+        'rValues': rValues,
+        'nbhdSize': nbhdSize,
+        'nPts': nPts,
         'points': points,
         'ellipseList': ellipseList,
         'simplexTreeEllipsoids': simplexTreeEllipsoids,
@@ -277,17 +331,34 @@ def loadVarsFromFile(filename):
             simplexTreeRips, barcodeEllipsoids, barcodeRips]
 
 def visualisation(**kwargs):
-    fig = plt.figure(figsize=(14,7))
-    gs = fig.add_gridspec(2,2)
-    axData = fig.add_subplot(gs[:, 0])
-    axBarE = fig.add_subplot(gs[0, 1])
-    axBarR = fig.add_subplot(gs[1, 1])
+    print('Generating plots...')
 
     points = kwargs['points']
     simplexTreeEllipsoids = kwargs['simplexTreeEllipsoids']
     simplexTreeRips = kwargs['simplexTreeRips']
     barcodeEllipsoids = kwargs['barcodeEllipsoids']
     barcodeRips = kwargs['barcodeRips']
+    dim = len(points[0,:])
+
+    if dim == 2 or dim == 3:
+        fig = plt.figure(figsize=(14,7))
+        gs = fig.add_gridspec(2,2)
+        if dim == 2:
+            axData = fig.add_subplot(gs[:, 0])
+        else:
+            axData = fig.add_subplot(gs[:,0], projection='3d')
+        axBarE = fig.add_subplot(gs[0, 1])
+        axBarR = fig.add_subplot(gs[1, 1])
+
+        for point in points:
+            axData.scatter(*point, c='k')
+        axData.set_title('Data (%d points)' %len(points), fontsize=12)
+
+    else:
+        fig = plt.figure(figsize=(14,7))
+        gs = fig.add_gridspec(2,1)
+        axBarE = fig.add_subplot(gs[0, 1])
+        axBarR = fig.add_subplot(gs[1, 1])
 
     if 'filename' in kwargs:
         filename = kwargs['filename']
@@ -299,12 +370,6 @@ def visualisation(**kwargs):
         plotEllipses(ellipseList, rPlot, axes=axData)
         plotSimplexTree(points, simplexTreeEllipsoids, rPlot, axes=axData)
         axData.set_title('Data and the ellipsoid simplex tree for r = %0.2f' %(rPlot), fontsize=12)
-
-    else:
-        for point in points:
-            axData.scatter(point[0], point[1], c='k')
-        axData.set_title('Data (%d points)' %len(points), fontsize=12)
-
 
     xAxisEnd = max(maxFiltration(simplexTreeEllipsoids), maxFiltration(simplexTreeRips)) + 0.1
     barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
@@ -319,6 +384,7 @@ def visualisation(**kwargs):
     
     if 'savePlot' in kwargs and kwargs['savePlot'] is True:
         plt.savefig(filename, dpi=300, bbox_inches='tight')
+        print('Plot saved to file.')
 
 def visualisationFromFile(filename, rPlot=0.6):
     [points, ellipseList, simplexTreeEllipsoids, simplexTreeRips, \
@@ -329,7 +395,18 @@ def visualisationFromFile(filename, rPlot=0.6):
                   barcodeEllipsoids=barcodeEllipsoids, \
                   barcodeRips=barcodeRips, \
                   showPlot = True,
-                  rPlot = rPlot)
+                  rPlot = rPlot,
+                  ellipseList = ellipseList
+                  )
+
+def readOFF(filename):
+    file = open(filename, 'r')
+    if 'OFF' != file.readline().strip():
+        raise('Not a valid OFF header')
+    nVerts, nFaces, nEdges = tuple([int(s) for s in file.readline().strip().split(' ')])
+    verts = [[float(s) for s in file.readline().strip().split(' ')] for i_vert in range(nVerts)]
+    faces = [[int(s) for s in file.readline().strip().split(' ')][1:] for i_face in range(nFaces)]
+    return np.asarray(verts)
 
 def main():
     ###### User input ######
@@ -339,8 +416,8 @@ def main():
     if boolPlotFromFile is True:
         ###### User input ######
         filenameLoad = \
-            'data/ellipsoids_nPts=20_rStep=0.05_nbhdSize=5_20230730_182216.json'
-        rPlot = 0
+            'data/ellipsoids_nPts=100_rStep=0.1_nbhdSize=5_20230802_095000.json'
+        rPlot = 4
         ########################
         visualisationFromFile(filenameLoad, rPlot=rPlot)
         print('Warning: the simplex tree plot may be inaccurate if the calculations were ' \
@@ -353,23 +430,38 @@ def main():
         boolSavePlot = True
         rPlot = 0
         # -------------------- #
-        dim = 2                 # dimension of the ambient space
-        rStart = 0.1
-        rEnd = 2
-        rStep = 0.01
+        dim = 3              # dimension of the ambient space
+        rStart = 0.2
+        rEnd = 6
+        rStep = 0.5
         rValues = np.arange(rStart, rEnd, rStep)
-        nbhdSize = 3         # number of points for doing PCA
-        nPts = 10            # number of data points
-        points = createData(nPts,'circle')
-        #points = shapes.sample_from_sphere(n=nPoints)
-        #points = figure_eight.figure_eight(nPoints, 1, 0.2)
+        rValues = [0.5, 1, 2, 5]
+        nbhdSize = 5         # number of points for doing PCA
+        nPts = 60            # number of data points
+        #points = createData(nPts,'circle')
+        #points = shapes.sample_from_sphere(n=nPts, d=(dim-1), seed=0)
+        #points = figure_eight.figure_eight(nPts, 1, 0.2)
+        points = readOFF('data/61.off')
+        points = points[1:100,:]
         ########################
+        rStart = rValues[0]
+        rEnd = rValues[-1]
+        rStep = abs(rValues[1] - rValues[0])
+        nPts = len(points)
+
+        print(f'{points=}')
+        # print(f'{points=}')
+        # fig0 = plt.figure()
+        # ax0 = fig0.add_subplot(projection='3d')jk
+        # ax0.scatter(points[:,0], points[:,1], points[:,2], c='k')
+        # plt.show()
+        # return True
 
         importantParameters = f'{nPts=}' + '_'+ f'{rStep=}' + '_' + f'{nbhdSize=}'
         dataPlotFilename='data/ellipsoids_'+importantParameters+datetime.now().strftime("_%Y%m%d_%H%M%S")
         
         if (boolShowPlot or boolSavePlot) and (rPlot not in rValues):
-            print('Warning: the simplex tree plot may be inaccurate since the calculations are ' \
+            print('\nWarning: the simplex tree plot may be inaccurate since the calculations are ' \
                 +'not performed for the chosen value of rPlot. To fix this, make sure that ' \
                 +'rPlot is in np.arange(rStart,rEnd,rStep).')
 
@@ -377,10 +469,19 @@ def main():
 
         kdTree = spatial.KDTree(points)
         ellipseList = fitEllipsoids(dim, kdTree, nbhdSize)
+        #debug:for ellipse in ellipseList:
+        #debug:    print(f'{ellipse.axes=}')
         longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipseList)
         queryRadius = 2*longestEllipsoidAxis
-        simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipseList, queryRadius, \
+        try:
+            simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipseList, queryRadius, \
                                                             filtrationValues = rValues)
+        except np.linalg.LinAlgError:
+            print("\nError: Attempting to add an edge in Ellipsoid Simplex from a vertex to itself. \n" + 
+                  "Reason: Two of the ellipsoids are the same because two points from " + \
+                  "the data set have the same neighbourhood. Please change the " + \
+                  "neighbourhood size (nbhdSize) and try again.")
+            return 0
         simplexTreeEllipsoids.expansion(dim) # expands the simplicial complex to include 
                                             # dim-dimensional simplices whose 1-skeleton is in simplexTree
         barcodeEllipsoids = simplexTreeEllipsoids.persistence()
@@ -393,9 +494,10 @@ def main():
         print('The total execution time is ' + str(tEnd-tStart))
         
         if boolSaveData is True:
-            saveVarsToFile(points, ellipseList, simplexTreeEllipsoids, \
-                        simplexTreeRips, barcodeEllipsoids, barcodeRips, \
-                        filename = dataPlotFilename + '.json')
+            saveVarsToFile(dim, rStart, rEnd, rStep, rValues, nbhdSize, nPts, \
+                           points, ellipseList, simplexTreeEllipsoids, \
+                           simplexTreeRips, barcodeEllipsoids, barcodeRips, \
+                           filename = dataPlotFilename + '.json')
 
         if (boolShowPlot or boolSavePlot) is True:
             visualisation(points = points,\

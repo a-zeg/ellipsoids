@@ -87,6 +87,9 @@ Depending on the user input (see the <a href="#user-input">User input</a> sectio
 - Save the generated plot.
 - Save the generated data to a JSON file.
 
+### File sizes
+For 100 points with `nbhdSize=10`, the size of the file to which data is saved can be larger than 1 GB.
+
 
 # Roadmap
 - [x] Minimal working example 
