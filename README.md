@@ -53,10 +53,10 @@ There is no need to install anything else, just download the project.
 
 # Usage
 To run the programme, run `ellipsoids.py`. 
-Depending on the value of `boolPlotFromFile`, the programme will either:
+The programme will calculate barcodes of ellipsoid and Rips complexes from data specified in `points` and possibly save the results to a JSON file and plot the barcodes, data, and possibly the ellipsoids.
 
-1. Load data from a file specified in the variable `filenameLoad` and plot it; or
-2. Calculate barcodes of ellipsoid and Rips complexes from data specified in `points`. 
+To plot results from a JSON file, run `plotFromFile.py`.
+
 
 ## User input
 All the parameters that need to be specified by the user are in `ellipsoids.py`, in places marked as follows:
@@ -69,9 +69,7 @@ All the parameters that need to be specified by the user are in `ellipsoids.py`,
 In particular, the user is expected to specify the following:
 | Variable name | Possible values | Description | 
 | :----------- | :-------------- | :--------- | 
-| `boolPlotFromFile` | `True` <br> `False` | Load data from file. <br> Perform calculations. |
-| `filenameLoad` | String | Name of the JSON file from which to load data.|
-| `rPlot` | Non-negative float | Filtration for which to plot the ellipsoid complex. If `rPlot = 0`, the ellipsoid complex will not be plotted.
+| `rPlot` | [optional] Non-negative float | Filtration for which to plot the ellipsoid complex. If `rPlot = 0`, the ellipsoid complex will not be plotted.
 | `boolSaveData` | Bool | If `True`, the data will be saved to a file. |
 | `boolShowPlot` | Bool | If `True`, the plot will be shown. |
 | `boolSavePlot` | Bool | If `True`, the plot will be saved as a PNG. |
@@ -81,7 +79,7 @@ In particular, the user is expected to specify the following:
 | `points` | Numpy array of numpy arrays | An array of data points |
 
 ## Output
-Depending on the user input (see the <a href="#user-input">User input</a> section above), the programme will:
+Depending on the user input (see the <a href="#user-input">User input</a> section above), `ellipsoids.py` will:
 - Output a plot containing the data points, ellipsoid complex barcode, Rips barcode.
 - Output a plot containing the data points with the ellipsoid complex, ellipsoid complex barcode, Rips barcode.
 - Save the generated plot.
@@ -92,10 +90,19 @@ For 100 points with `nbhdSize=10`, the size of the file to which data is saved c
 
 
 # Roadmap
-- [x] Minimal working example 
+- [x] Minimal working example.
 - [x] Save generated data to file.
 - [x] Import saved data from a file and generate figures.
-- [ ] Support for 3+ dimensional data.
+
+### Since 20230802:
+- [X] Support for 3+ dimensional ellipsoids.
+- [X] Plotting 3-dimensional data, including ellipsoids.
+- [X] Storing most variables in JSON.
+- [X] Importing OFF files (for meshes).
+- [X] Importing CycloOctane dataset from Javaplex.
+
+### Pending:
+- a smarter way to choose the filtration for which to calculate the ellipsoid complex up to a given error.
 
 # Acknowledgements
 - Kalisnik, Lesnik - [Finding the Homology of Manifolds using Ellipsoids (2020)](https://arxiv.org/abs/2006.09194) is the inspiration for this project.
