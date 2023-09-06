@@ -286,25 +286,9 @@ class CustomEncoder(json.JSONEncoder):
             return list(obj.get_filtration())
         return json.JSONEncoder.default(self, obj)
     
-def saveVarsToFile(dim, rStart, rEnd, rStep, rValues, nbhdSize, nPts, points, ellipsoidList, simplexTreeEllipsoids, \
-                simplexTreeRips, barcodeEllipsoids, barcodeRips, \
-                filename=datetime.now().strftime("data/test.json")):
+def saveVarsToFile(dictOfVars,
+                   filename=datetime.now().strftime("data/test.json")):
     print('Saving data to file...')
-    dictOfVars = {
-        'dim': dim,
-        'rStart': rStart,
-        'rEnd': rEnd,
-        'rStep': rStep,
-        'rValues': rValues,
-        'nbhdSize': nbhdSize,
-        'nPts': nPts,
-        'points': points,
-        'ellipsoidList': ellipsoidList,
-        'simplexTreeEllipsoids': simplexTreeEllipsoids,
-        'simplexTreeRips': simplexTreeRips,
-        'barcodeEllipsoids': barcodeEllipsoids,
-        'barcodeRips': barcodeRips
-    }
     json_string = json.dumps(dictOfVars, cls=CustomEncoder, indent=4)
     with open(filename, 'w') as outfile:
         outfile.write(json_string)
@@ -382,11 +366,14 @@ def visualisation(**kwargs):
     print('Generating plots...')
 
     points = kwargs['points']
+    dim = len(points[0,:])
     simplexTreeEllipsoids = kwargs['simplexTreeEllipsoids']
-    simplexTreeRips = kwargs['simplexTreeRips']
+    simplexTreeEllipsoids.expansion(dim)
+    # simplexTreeRips = kwargs['simplexTreeRips']
+    ripsComplex = gd.RipsComplex(points=points)
+    simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
     barcodeEllipsoids = kwargs['barcodeEllipsoids']
     barcodeRips = kwargs['barcodeRips']
-    dim = len(points[0,:])
 
     if dim == 2 or dim == 3:
         fig = plt.figure(figsize=(14,7))
@@ -435,12 +422,12 @@ def visualisation(**kwargs):
         for rValue in rValues:
             axBarE.axvline(x = rValue, color='gray', linewidth=0.5, linestyle='dashed')
     
-    if 'showPlot' in kwargs and kwargs['showPlot'] is True:
-        plt.show()
-
     if 'savePlot' in kwargs and kwargs['savePlot'] is True:
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         print('Plot saved to file.')
+
+    if 'showPlot' in kwargs and kwargs['showPlot'] is True:
+        plt.show()
 
 def visualisationFromFile(filename, rPlot=0.6, plotEllipsoids=False):
     vars = loadVarsFromFile(filename)
@@ -488,21 +475,36 @@ def COOsignature(persistanceBarcode):
 
     pass
 
+def calculateBottleeckDistance(barcode1, barcode2, dim):
+    # create the numpy array in dimension dim
+    npBarcode1 = np.array()
+    npBarcode2 = np.array()
+    for line in barcode1:
+        npBarcode1[line[0]].append(line[1])
+    for line in barcode2:
+        npBarcode2[line[0]].append(line[1])
+
+    bottleneckDistance = [gd.bottleneck_distance(i,j) for i,j in zip(npBarcode1, npBarcode2)]
+
+    # TODO: finish this
+    pass
+
+
 def main():
     
     ###### User input ######
     boolSaveData = True
     boolShowPlot = True
-    boolSavePlot = True
-    rPlot = 0
+    boolSavePlot = False
+    rPlot = 2.7            # if rPlot = 0, ellipses won't be plotted
     # -------------------- #
     dim = 2              # dimension of the ambient space
-    rStart = 0.2
-    rEnd = 6
-    rStep = 0.5
+    rStart = 0.01
+    rEnd = 3
+    rStep = 0.2
     rValues = np.arange(rStart, rEnd, rStep)
     nbhdSize = 5         # number of points for doing PCA
-    nPts = 50            # number of data points
+    nPts = 30            # number of data points
     # --------------------- #
     #   Specifying points   #
 
@@ -513,7 +515,7 @@ def main():
     # points = shapes.sample_from_sphere(n=nPts, d=(dim-1), seed=0)
 
     # figure eight:
-    points = figure_eight.figure_eight(nPts, 1, 0.5)
+    points = figure_eight.figure_eight(nPts, 1, 0.1)
 
     # to read in a mesh from an OFF file:
     # points = readOFF('data/61.off') # warning: 61.off is a mesh with 1k+ vertices.
@@ -521,6 +523,10 @@ def main():
     # to read in the CycloOctane dataset:
     # points = np.asarray(\
     #     scipy.io.loadmat('pointsCycloOctane.mat')['pointsCycloOctane']) # size: 6040 x 24
+    # points = points[1:100,:]
+    # # scipy.io.savemat('data/cyclooctane.mat', {'points': points})
+    # dim = 24
+    # nbhdSize = 26
     ########################
 
     rStart = rValues[0]
@@ -542,18 +548,26 @@ def main():
     ellipsoidList = fitEllipsoids(dim, kdTree, nbhdSize)
     longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipsoidList)
     queryRadius = 2*longestEllipsoidAxis
+    # original:
     try:
         simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, \
                                                         filtrationValues = rValues)
     except np.linalg.LinAlgError:
+        print(f'{points=}')
         print("\nError: Attempting to add an edge in Ellipsoid Simplex from a vertex to itself. \n" + 
                 "Reason: Two of the ellipsoids are the same because two points from " + \
                 "the data set have the same neighbourhood. Please change the " + \
                 "neighbourhood size (nbhdSize) and try again.")
         return 0
-    simplexTreeEllipsoids.expansion(dim) # expands the simplicial complex to include 
+    #debug:
+    # simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, \
+    #                                                     filtrationValues = rValues)
+    # ----
+
+    simplexTreeEllipsoidsExpanded = simplexTreeEllipsoids
+    simplexTreeEllipsoidsExpanded.expansion(dim) # expands the simplicial complex to include 
                                         # dim-dimensional simplices whose 1-skeleton is in simplexTree
-    barcodeEllipsoids = simplexTreeEllipsoids.persistence()
+    barcodeEllipsoids = simplexTreeEllipsoidsExpanded.persistence()
 
     ripsComplex = gd.RipsComplex(points=points)
     simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
@@ -562,11 +576,35 @@ def main():
     tEnd = time.time()      # for testing performace
     print('The total execution time is ' + str(tEnd-tStart))
     
+    # in progress
+    # bottleneckDistance = calculateBottleneckDistance(barcodeRips,barcodeEllipsoids)
+    # print(f'{bottleneckDistance=}')
+
     if boolSaveData is True:
-        saveVarsToFile(dim, rStart, rEnd, rStep, rValues, nbhdSize, nPts, \
-                        points, ellipsoidList, simplexTreeEllipsoids, \
-                        simplexTreeRips, barcodeEllipsoids, barcodeRips, \
-                        filename = dataPlotFilename + '.json')
+        # debug:
+        # barcodeRips1 = barcodeRips
+        # barcodeRips = [0,[0,1]]
+
+        dictOfVars = {
+            'dim': dim,
+            'rStart': rStart,
+            'rEnd': rEnd,
+            'rStep': rStep,
+            'rValues': rValues,
+            'nbhdSize': nbhdSize,
+            'nPts': nPts,
+            'points': points,
+            'ellipsoidList': ellipsoidList,
+            'simplexTreeEllipsoids': simplexTreeEllipsoids,
+            # 'simplexTreeRips': simplexTreeRips,
+            'barcodeEllipsoids': barcodeEllipsoids,
+            'barcodeRips': barcodeRips
+        }
+        saveVarsToFile(dictOfVars, \
+                       filename = dataPlotFilename + '.json')
+        
+        # debug:
+        # barcodeRips = barcodeRips1
 
     if (boolShowPlot or boolSavePlot) is True:
         visualisation(points = points,\
