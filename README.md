@@ -101,8 +101,75 @@ For 100 points with `nbhdSize=10`, the size of the file to which data is saved c
 - [X] Importing OFF files (for meshes).
 - [X] Importing CycloOctane dataset from Javaplex.
 
+### Since 2023080?:
+- [X] Saving only the 1-skeleton
+- [X] Ellipsoids with fixed aspect ratios
+- [X] calculate bottleneck distance between two complexes 
+- [X] more precisely generating the ellipsoid simplex tree (not only at fixed filtration values)
+- [X] create pictures comparing rips and ellipsoid complexes for various:
+  * point clouds
+  * ratios of ellipses in ellipsoid complexes
+
+### Results: Ellipsoid vs Rips complex
+
+#### Barcodes for different aspect ratios
+##### Circle point cloud
+- 1:1
+![Ellipsoid plots](images/circle_1-1_n=50.png)
+
+- 2:1
+![Ellipsoid plots](images/circle_2-1_n=50.png)
+
+- 5:1
+![Ellipsoid plots](images/circle_5-1_n=50.png)
+
+- 10:1
+![Ellipsoid plots](images/circle_10-1_n=50.png)
+
+
+##### Sphere point cloud
+- 1:1
+![Ellipsoid plots](images/sphere_1-1-1_n=100.png)
+
+- 2:1
+![Ellipsoid plots](images/sphere_2-1-1_n=100.png)
+
+- 5:1
+![Ellipsoid plots](images/sphere_5-1-1_n=100.png)
+
+
+
+##### Figure eight point cloud
+- 1:1
+![Ellipsoid plots](images/figureEight_1-1_n=100.png)
+
+- 2:1
+![Ellipsoid plots](images/figureEight_2-1_n=100.png)
+
+- 5:1
+![Ellipsoid plots](images/figureEight_5-1_n=100.png)
+
+- 10:1
+![Ellipsoid plots](images/figureEight_10-1_n=100.png)
+
+<!--
+#### Bottleneck distance 
+##### Bottleneck distance between ellipsoid and Rips complex
+- without outliers -
+[parameter values]
+
+- with outliers
+
+##### Bottleneck distance with vs without outliers (ellipsoid complex)
+
+
+##### Bottleneck distance with vs without outliers (Rips complex)
+-->
+
+
 ### Pending:
-- a smarter way to choose the filtration for which to calculate the ellipsoid complex up to a given error.
+- normalise r between rips and ellipsoid complexes (Rips = 2*Ellipsoid)
+- calculate bottleneck distances if there are outliers and if not for both Rips and ellipsoid complexes
 
 # Acknowledgements
 - Kalisnik, Lesnik - [Finding the Homology of Manifolds using Ellipsoids (2020)](https://arxiv.org/abs/2006.09194) is the inspiration for this project.

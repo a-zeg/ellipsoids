@@ -1,3 +1,8 @@
+# problems:
+# some close ones are touching but no edge (e.g. around 2am)
+# ratios not always same 
+# - maybe axes are not noramlised? they seem normalised
+
 import numpy as np
 import gudhi as gd
 import matplotlib.pyplot as plt
@@ -40,7 +45,7 @@ class Ellipsoid:
         return json.dumps(self.toDict(), 
             sort_keys=True, indent=4)
 
-def createData(nPoints, type, variation = 0.1, dim=2):
+def createData(nPoints, type, variation = 0.1, dim=2, outliers=False):
     ''' Generate point cloud data of type 'type' and consiting of 'nPoints' points.
     :nPoints: Number of points to generate
     :type: Type of data (e.g. 'circle', 'ellipse', 'Cassini_oval')
@@ -51,11 +56,15 @@ def createData(nPoints, type, variation = 0.1, dim=2):
     np.random.seed(0)
 
     if type == 'circle':
+        if outliers is True: nPoints = nPoints - 1
         r = 1
         t = np.linspace(0, 2*np.pi * (nPoints-1)/nPoints, nPoints)
         x = r*np.cos(t) + variation * np.random.rand(nPoints)
         y = r*np.sin(t) + variation * np.random.rand(nPoints)
         output = np.vstack((x,y)).transpose()
+
+        if outliers is True:
+            output = np.append(output,[[0,0]],axis=0)
 
     elif type == 'ellipse':
         t = np.linspace(0, 2*np.pi * (nPoints-1)/nPoints, nPoints)
@@ -83,7 +92,7 @@ def createData(nPoints, type, variation = 0.1, dim=2):
     
     return output
 
-def fitEllipsoid(dim, center, neighbourhood):
+def fitEllipsoid(dim, center, neighbourhood, axesRatios=0):
     ''' Use PCA to fit an ellipsoid to the given neighbourhood
     :return: ellipsoid of dimension dim with axes obtained from PCA
     '''
@@ -91,18 +100,24 @@ def fitEllipsoid(dim, center, neighbourhood):
     pca.fit(neighbourhood)
     axes = pca.components_
     axesLengths = pca.singular_values_
+    if axesRatios.all() != 0:
+        axesLengths = axesRatios / axesRatios[0]
+        # alt20230927: if r should determine the short axis
+        # axesLengths = axesRatios / axesRatios[-1] 
+        # /alt
     return Ellipsoid(center, axes, axesLengths)
 
-def fitEllipsoids(dim, kdTree, neighbourhoodSize):
+def fitEllipsoids(dim, kdTree, neighbourhoodSize, axesRatios = 0):
     points = kdTree.data
     nPoints = len(points)
     ellipseList = []
     for point in points:
         [NULL,neighbourhoodIdx] = kdTree.query(point, min(nPoints,neighbourhoodSize))
         neighbourhood = points[neighbourhoodIdx]
-        currentEllipsoid = fitEllipsoid(dim, point, neighbourhood)
+        currentEllipsoid = fitEllipsoid(dim, point, neighbourhood, axesRatios)
         ellipseList.append(currentEllipsoid)
     return ellipseList
+
 
 def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     sampleRate = 100
@@ -220,6 +235,53 @@ def generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, filtrationVa
 
     return simplexTree
 
+def generateEllipoidSimplexTree2(kdTree, ellipsoidList, axesRatios):
+    ''' Creates a simplex tree from the ellipsoids by adding an edge between each two points whose 
+    corresponding ellipsoids intersect.
+    :kdTree: KD tree of the initial dataset
+    :ellipsoidList: list of ellipsoids (output of ??)
+    :queryRadius:
+    :filtrationValues:
+
+    :return: gudhi.SimplexTree
+    '''
+    points = kdTree.data
+    nPoints = len(points)
+    simplexTree = gd.SimplexTree()
+    distanceMatrix = spatial.distance.squareform(spatial.distance.pdist(points))
+    threshold = 0.001
+    epsilon = 0.001
+
+    for i in range(nPoints):
+        simplexTree.insert([i], 0)
+        for j in range(i+1,nPoints):
+            dist = distanceMatrix[i,j]
+            if axesRatios.all() != 0:
+                maxNonIntersectionFiltration = (dist / 2) - epsilon
+                minIntersectionFiltration = dist/2 * max(axesRatios) + epsilon
+            else:
+                longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipsoidList)
+                maxNonIntersectionFiltration = (dist / 2) - epsilon
+                minIntersectionFiltration = dist/2 * longestEllipsoidAxis + epsilon
+            # alt20230927: if r should determine the short axis
+            # maxNonIntersectionFiltration = (dist / 2) / max(axesRatios) - epsilon
+            # minIntersectionFiltration = dist/2 + epsilon
+            # /alt
+
+            r = (minIntersectionFiltration - maxNonIntersectionFiltration)/2
+
+            while True:
+                if ellipsoidIntersection(ellipsoidList[i], ellipsoidList[j], r):
+                    minIntersectionFiltration = r
+                else: maxNonIntersectionFiltration = r
+
+                if (minIntersectionFiltration - maxNonIntersectionFiltration) < threshold:
+                    simplexTree.insert([i,j], r)
+                    break
+                else: r = (minIntersectionFiltration + maxNonIntersectionFiltration)/2
+
+    return simplexTree
+
 def plotSimplexTree(points, simplexTree, r, axes):
     dim = len(points[0])
     if dim > 3:
@@ -242,7 +304,10 @@ def plotSimplexTree(points, simplexTree, r, axes):
                         if dim == 2:
                             plt.fill(*np.transpose(points[vertices]), c='r', alpha=0.1)
     else:
+        idx = 1
         for splx in simplexList:
+            idx = idx + 1
+            
             if splx[1] <= r:
                 vertices = splx[0]
                 match len(vertices):
@@ -368,13 +433,14 @@ def visualisation(**kwargs):
     points = kwargs['points']
     dim = len(points[0,:])
     simplexTreeEllipsoids = kwargs['simplexTreeEllipsoids']
-    simplexTreeEllipsoids.expansion(dim)
+    #simplexTreeEllipsoids.expansion(dim)
     # simplexTreeRips = kwargs['simplexTreeRips']
     ripsComplex = gd.RipsComplex(points=points)
     simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
     barcodeEllipsoids = kwargs['barcodeEllipsoids']
     barcodeRips = kwargs['barcodeRips']
 
+    # plotting ellipsoids (only if 2- or 3-dimensional)
     if dim == 2 or dim == 3:
         fig = plt.figure(figsize=(14,7))
         gs = fig.add_gridspec(2,2)
@@ -384,11 +450,9 @@ def visualisation(**kwargs):
             axData = fig.add_subplot(gs[:,0], projection='3d')
         axBarE = fig.add_subplot(gs[0, 1])
         axBarR = fig.add_subplot(gs[1, 1])
-
         for point in points:
             axData.scatter(*point, c='k')
         axData.set_title('Data (%d points)' %len(points), fontsize=12)
-
         if ('ellipsoidList' in kwargs or 'ellipseList' in kwargs) and ('rPlot' in kwargs) and (kwargs['rPlot'] != 0):
             ellipsoidList = kwargs['ellipsoidList'] if 'ellipsoidList' in kwargs else kwargs['ellipseList']
             rPlot = kwargs['rPlot']
@@ -398,6 +462,7 @@ def visualisation(**kwargs):
                 plotEllipsoids(ellipsoidList, rPlot, axes=axData)
             plotSimplexTree(points, simplexTreeEllipsoids, rPlot, axes=axData)
             axData.set_title('Data and the ellipsoid simplex tree for r = %0.2f' %(rPlot), fontsize=12)
+        axData.set_aspect('equal', adjustable='box')
 
     else:
         fig = plt.figure(figsize=(14,7))
@@ -405,22 +470,26 @@ def visualisation(**kwargs):
         axBarE = fig.add_subplot(gs[0, 1])
         axBarR = fig.add_subplot(gs[1, 1])
 
+
     if 'filename' in kwargs:
         filename = kwargs['filename']
     else: filename = 'data/plotTest.png'
 
-    xAxisEnd = max(maxFiltration(simplexTreeEllipsoids), maxFiltration(simplexTreeRips)) + 0.1
+    # plotting barcodes
+    xAxisEnd = max(maxFiltration(simplexTreeEllipsoids)*2, maxFiltration(simplexTreeRips)) + 0.1
     barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
-                                             axis_start = -0.1, infinity = xAxisEnd)
+                                             axis_start = -0.1, infinity = xAxisEnd / 2) #(0.1 + xAxisEnd) /2 ) # todo: put this back to xAxisEnd (without /2)
     axBarE.set_title('Ellipsoid barcode', fontsize=12)
     barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
-                                             axis_start = -0.1, infinity = xAxisEnd + 0.1)
+                                             axis_start = -0.1, infinity = xAxisEnd) #(0.1 + xAxisEnd))
     axBarR.set_title('Rips barcode', fontsize=12)
 
-    if 'rValues' in kwargs:
-        rValues = kwargs['rValues']
-        for rValue in rValues:
-            axBarE.axvline(x = rValue, color='gray', linewidth=0.5, linestyle='dashed')
+
+    # plotting the vertical lines at r
+    # if 'rValues' in kwargs:
+    #     rValues = kwargs['rValues']
+    #     for rValue in rValues:
+    #         axBarE.axvline(x = rValue, color='gray', linewidth=0.5, linestyle='dashed')
     
     if 'savePlot' in kwargs and kwargs['savePlot'] is True:
         plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -436,7 +505,6 @@ def visualisationFromFile(filename, rPlot=0.6, plotEllipsoids=False):
         visualisation(points = vars['points'],\
                     ellipsoidList = vars['ellipsoidList'], rPlot = rPlot, \
                     simplexTreeEllipsoids = vars['simplexTreeEllipsoids'], \
-                    simplexTreeRips = vars['simplexTreeRips'], \
                     barcodeEllipsoids = vars['barcodeEllipsoids'], \
                     barcodeRips = vars['barcodeRips'], \
                     showPlot = True, \
@@ -447,7 +515,6 @@ def visualisationFromFile(filename, rPlot=0.6, plotEllipsoids=False):
         visualisation(points = vars['points'],\
                     #ellipsoidList = vars['ellipsoidList'], rPlot = rPlot, \
                     simplexTreeEllipsoids = vars['simplexTreeEllipsoids'], \
-                    simplexTreeRips = vars['simplexTreeRips'], \
                     barcodeEllipsoids = vars['barcodeEllipsoids'], \
                     barcodeRips = vars['barcodeRips'], \
                     showPlot = True, \
@@ -493,23 +560,25 @@ def calculateBottleeckDistance(barcode1, barcode2, dim):
 def main():
     
     ###### User input ######
-    boolSaveData = True
+    boolSaveData = False
     boolShowPlot = True
     boolSavePlot = False
-    rPlot = 2.7            # if rPlot = 0, ellipses won't be plotted
+    rPlot = 0.05            # if rPlot = 0, ellipses won't be plotted
     # -------------------- #
     dim = 2              # dimension of the ambient space
-    rStart = 0.01
-    rEnd = 3
-    rStep = 0.2
+    rStart = 0.1
+    rEnd = 4
+    rStep = 0.1
     rValues = np.arange(rStart, rEnd, rStep)
-    nbhdSize = 5         # number of points for doing PCA
-    nPts = 30            # number of data points
+    nbhdSize = 12         # number of points for doing PCA
+    nPts = 100            # number of data points
+    axesRatios = np.array([10,1])
     # --------------------- #
     #   Specifying points   #
 
     # 2d circle, ellipse:
-    # points = createData(nPts,'circle')
+    # points = createData(nPts,'circle', variation = 0.2)
+    # points = createData(nPts,'circle', outliers = False)
 
     # more advanced circle, annulus (also in higher dimensions):
     # points = shapes.sample_from_sphere(n=nPts, d=(dim-1), seed=0)
@@ -545,13 +614,14 @@ def main():
     tStart = time.time()    # for testing performace
 
     kdTree = spatial.KDTree(points)
-    ellipsoidList = fitEllipsoids(dim, kdTree, nbhdSize)
+    ellipsoidList = fitEllipsoids(dim, kdTree, nbhdSize, axesRatios)
     longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipsoidList)
     queryRadius = 2*longestEllipsoidAxis
     # original:
     try:
-        simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, \
-                                                        filtrationValues = rValues)
+        #simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, \
+        #                                               filtrationValues = rValues)
+        simplexTreeEllipsoids = generateEllipoidSimplexTree2(kdTree, ellipsoidList, axesRatios)
     except np.linalg.LinAlgError:
         print(f'{points=}')
         print("\nError: Attempting to add an edge in Ellipsoid Simplex from a vertex to itself. \n" + 
@@ -564,7 +634,7 @@ def main():
     #                                                     filtrationValues = rValues)
     # ----
 
-    simplexTreeEllipsoidsExpanded = simplexTreeEllipsoids
+    simplexTreeEllipsoidsExpanded = simplexTreeEllipsoids.copy()
     simplexTreeEllipsoidsExpanded.expansion(dim) # expands the simplicial complex to include 
                                         # dim-dimensional simplices whose 1-skeleton is in simplexTree
     barcodeEllipsoids = simplexTreeEllipsoidsExpanded.persistence()
@@ -572,14 +642,22 @@ def main():
     ripsComplex = gd.RipsComplex(points=points)
     simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
     barcodeRips = simplexTreeRips.persistence()
+    # for entry in simplexTreeRips.persistence_intervals_in_dimension(0):
+    #     print(entry)
+
+    dist = 0
+    for d in np.arange(dim+1):
+        dist = dist + gd.bottleneck_distance(
+            simplexTreeRips.persistence_intervals_in_dimension(d),
+            simplexTreeEllipsoidsExpanded.persistence_intervals_in_dimension(d)
+            )
+        
+    print(f'{dist=}')
+    #print(simplexTreeRips.persistence_intervals_in_dimension(1))
 
     tEnd = time.time()      # for testing performace
     print('The total execution time is ' + str(tEnd-tStart))
     
-    # in progress
-    # bottleneckDistance = calculateBottleneckDistance(barcodeRips,barcodeEllipsoids)
-    # print(f'{bottleneckDistance=}')
-
     if boolSaveData is True:
         # debug:
         # barcodeRips1 = barcodeRips
