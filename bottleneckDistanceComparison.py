@@ -45,7 +45,7 @@ def plotDistances(distanceEllipsoids, distanceRips):
     ax.bar(0.3, distanceRips, width)
 
     ax.set_ylabel('Sum of bottleneck distances in all dimensions')
-    ax.set_title('Comparison of bottleneck distances between Ellipsoids and Rips complexes')
+    ax.set_title('Comparison of bottleneck distances between Ellipsoid and Rips complexes')
     ax.set_xticks([0,0.3])
     ax.set_xticklabels(['Ellipsoid complex', 'Rips complex'])
 
@@ -58,6 +58,10 @@ def main():
         'data/ellipsoids_nPts=50_rStep=0.1_nbhdSize=5_20230927_144941.json'
     [distanceEllipsoids, distanceRips] = calculateBottleneckDistances(filename1,filename2)
     plotDistances(distanceEllipsoids, distanceRips)
+
+    print(f'{distanceEllipsoids=}')
+    print(f'{distanceRips=}')
+
 
 
 if __name__ == "__main__":

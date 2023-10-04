@@ -177,6 +177,21 @@ For 100 points with `nbhdSize=10`, the size of the file to which data is saved c
 ##### Bottleneck distance with vs without outliers (Rips complex)
 -->
 
+#### Bottleneck distance with outliers and without outliers
+
+In the circle example the distances between Rips complexes and between Ellipsoids complexes in the following two cases 
+![Circle without outliers](images/ellipsoids_nPts=50_rStep=0.1_nbhdSize=5_20230927_145605.png)
+and
+![Circle with outliers](images/ellipsoids_nPts=50_rStep=0.1_nbhdSize=5_20230927_144941.png)
+are:
+| Type       | Distance |
+|------------|----------|
+| Ellipsoids | 0.63     |
+| Rips       | 1.12     |
+
+![Bottleneck distance](images/bottleneckdistance_circle_outliers.png)
+
+
 
 ### Pending:
 - calculate bottleneck distances if there are outliers and if not for both Rips and ellipsoid complexes for multiple examples
