@@ -153,9 +153,12 @@ For 100 points with `nbhdSize=10`, the size of the file to which data is saved c
 ![Ellipsoid plots](images/figureEight_10-1_n=100.png)
 
 
-#### Speed
+### Since 20230927
 
-##### Circle, variation=0.2
+
+#### Speed 
+
+The following is for circle with variation=0.2 with and without a point in the centre.
 
 | nPoints | EllpsoidsTime / RipsTime | Total time [s] | nbhdSize |
 |---------|--------------------------|----------------|----------|
