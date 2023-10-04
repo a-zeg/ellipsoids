@@ -276,7 +276,8 @@ def generateEllipoidSimplexTree2(kdTree, ellipsoidList, axesRatios):
                 else: maxNonIntersectionFiltration = r
 
                 if (minIntersectionFiltration - maxNonIntersectionFiltration) < threshold:
-                    simplexTree.insert([i,j], r)
+                    # simplexTree.insert([i,j], r)
+                    simplexTree.insert([i,j], 2*r) # alt20230927_2: 2r so that it's comparable to Rips
                     break
                 else: r = (minIntersectionFiltration + maxNonIntersectionFiltration)/2
 
@@ -308,7 +309,8 @@ def plotSimplexTree(points, simplexTree, r, axes):
         for splx in simplexList:
             idx = idx + 1
             
-            if splx[1] <= r:
+            # if splx[1] <= r:
+            if splx[1] <= 2*r: # alt20230927_2: 2r so that it's comparable to Rips
                 vertices = splx[0]
                 match len(vertices):
                     case 1:
@@ -476,13 +478,24 @@ def visualisation(**kwargs):
     else: filename = 'data/plotTest.png'
 
     # plotting barcodes
-    xAxisEnd = max(maxFiltration(simplexTreeEllipsoids)*2, maxFiltration(simplexTreeRips)) + 0.1
+    # xAxisEnd = max(maxFiltration(simplexTreeEllipsoids)*2, maxFiltration(simplexTreeRips)) + 0.1
+    # barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
+    #                                          axis_start = -0.1, infinity = xAxisEnd / 2) #(0.1 + xAxisEnd) /2 ) # todo: put this back to xAxisEnd (without /2)
+    # axBarE.set_title('Ellipsoid barcode', fontsize=12)
+    # barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
+    #                                          axis_start = -0.1, infinity = xAxisEnd) #(0.1 + xAxisEnd))
+    # axBarR.set_title('Rips barcode', fontsize=12)
+
+    # alt20230927_2: ellipsoid simplex filtration is 2r so that it's comparable to Rips
+    # plotting barcodes
+    xAxisEnd = max(maxFiltration(simplexTreeEllipsoids), maxFiltration(simplexTreeRips)) + 0.1
     barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
-                                             axis_start = -0.1, infinity = xAxisEnd / 2) #(0.1 + xAxisEnd) /2 ) # todo: put this back to xAxisEnd (without /2)
+                                             axis_start = -0.1, infinity = xAxisEnd) #(0.1 + xAxisEnd) /2 ) # todo: put this back to xAxisEnd (without /2)
     axBarE.set_title('Ellipsoid barcode', fontsize=12)
     barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
                                              axis_start = -0.1, infinity = xAxisEnd) #(0.1 + xAxisEnd))
     axBarR.set_title('Rips barcode', fontsize=12)
+    # /alt
 
 
     # plotting the vertical lines at r
@@ -553,38 +566,40 @@ def calculateBottleeckDistance(barcode1, barcode2, dim):
 
     bottleneckDistance = [gd.bottleneck_distance(i,j) for i,j in zip(npBarcode1, npBarcode2)]
 
+    return bottleneckDistance
     # TODO: finish this
     pass
 
 
 def main():
-    
+    tStart = time.time()
+
     ###### User input ######
     boolSaveData = False
     boolShowPlot = True
     boolSavePlot = False
-    rPlot = 0.05            # if rPlot = 0, ellipses won't be plotted
+    rPlot = 0.7            # if rPlot = 0, ellipses won't be plotted
     # -------------------- #
     dim = 2              # dimension of the ambient space
     rStart = 0.1
     rEnd = 4
     rStep = 0.1
     rValues = np.arange(rStart, rEnd, rStep)
-    nbhdSize = 12         # number of points for doing PCA
+    nbhdSize = 10         # number of points for doing PCA
     nPts = 100            # number of data points
-    axesRatios = np.array([10,1])
+    axesRatios = np.array([2,1])
     # --------------------- #
     #   Specifying points   #
 
     # 2d circle, ellipse:
-    # points = createData(nPts,'circle', variation = 0.2)
+    points = createData(nPts,'circle', variation = 0.2)
     # points = createData(nPts,'circle', outliers = False)
 
     # more advanced circle, annulus (also in higher dimensions):
     # points = shapes.sample_from_sphere(n=nPts, d=(dim-1), seed=0)
 
     # figure eight:
-    points = figure_eight.figure_eight(nPts, 1, 0.1)
+    # points = figure_eight.figure_eight(nPts, 1, 0.1)
 
     # to read in a mesh from an OFF file:
     # points = readOFF('data/61.off') # warning: 61.off is a mesh with 1k+ vertices.
@@ -592,10 +607,11 @@ def main():
     # to read in the CycloOctane dataset:
     # points = np.asarray(\
     #     scipy.io.loadmat('pointsCycloOctane.mat')['pointsCycloOctane']) # size: 6040 x 24
-    # points = points[1:100,:]
+    # points = points[1:200,:]
     # # scipy.io.savemat('data/cyclooctane.mat', {'points': points})
     # dim = 24
     # nbhdSize = 26
+    # axesRatios = np.ones([dim,1])
     ########################
 
     rStart = rValues[0]
@@ -611,33 +627,36 @@ def main():
             +'not performed for the chosen value of rPlot. To fix this, make sure that ' \
             +'rPlot is in np.arange(rStart,rEnd,rStep).')
 
-    tStart = time.time()    # for testing performace
+    tStartEllipsoids = time.time()    # for testing performace
 
     kdTree = spatial.KDTree(points)
     ellipsoidList = fitEllipsoids(dim, kdTree, nbhdSize, axesRatios)
     longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipsoidList)
     queryRadius = 2*longestEllipsoidAxis
     # original:
-    try:
-        #simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, \
-        #                                               filtrationValues = rValues)
-        simplexTreeEllipsoids = generateEllipoidSimplexTree2(kdTree, ellipsoidList, axesRatios)
-    except np.linalg.LinAlgError:
-        print(f'{points=}')
-        print("\nError: Attempting to add an edge in Ellipsoid Simplex from a vertex to itself. \n" + 
-                "Reason: Two of the ellipsoids are the same because two points from " + \
-                "the data set have the same neighbourhood. Please change the " + \
-                "neighbourhood size (nbhdSize) and try again.")
-        return 0
+    # try:
+    #     # simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, \
+    #     #                                               filtrationValues = rValues)
+    #     simplexTreeEllipsoids = generateEllipoidSimplexTree2(kdTree, ellipsoidList, axesRatios)
+    # except np.linalg.LinAlgError:
+    #     print(f'{points=}')
+    #     print("\nError: Attempting to add an edge in Ellipsoid Simplex from a vertex to itself. \n" + 
+    #             "Reason: Two of the ellipsoids are the same because two points from " + \
+    #             "the data set have the same neighbourhood. Please change the " + \
+    #             "neighbourhood size (nbhdSize) and try again.")
+    #     return 0
     #debug:
-    # simplexTreeEllipsoids = generateEllipoidSimplexTree(kdTree, ellipsoidList, queryRadius, \
-    #                                                     filtrationValues = rValues)
+    simplexTreeEllipsoids = generateEllipoidSimplexTree2(kdTree, ellipsoidList, axesRatios)
     # ----
 
     simplexTreeEllipsoidsExpanded = simplexTreeEllipsoids.copy()
     simplexTreeEllipsoidsExpanded.expansion(dim) # expands the simplicial complex to include 
                                         # dim-dimensional simplices whose 1-skeleton is in simplexTree
     barcodeEllipsoids = simplexTreeEllipsoidsExpanded.persistence()
+    
+    tEndEllipsoids = time.time()
+
+    tStartRips = time.time()
 
     ripsComplex = gd.RipsComplex(points=points)
     simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
@@ -645,17 +664,19 @@ def main():
     # for entry in simplexTreeRips.persistence_intervals_in_dimension(0):
     #     print(entry)
 
-    dist = 0
-    for d in np.arange(dim+1):
-        dist = dist + gd.bottleneck_distance(
-            simplexTreeRips.persistence_intervals_in_dimension(d),
-            simplexTreeEllipsoidsExpanded.persistence_intervals_in_dimension(d)
-            )
-        
-    print(f'{dist=}')
+    tEndRips = time.time()
+
+    tEllipsoids = tEndEllipsoids - tStartEllipsoids
+    tRips = tEndRips - tStartRips
+    tRatio = tEllipsoids / tRips
+
+    print(f'{nPts=}')
+    print(f'{tRatio=}')
+    print(f'{nbhdSize}')
     #print(simplexTreeRips.persistence_intervals_in_dimension(1))
 
-    tEnd = time.time()      # for testing performace
+    tEnd = time.time()
+
     print('The total execution time is ' + str(tEnd-tStart))
     
     if boolSaveData is True:

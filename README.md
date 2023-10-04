@@ -152,6 +152,17 @@ For 100 points with `nbhdSize=10`, the size of the file to which data is saved c
 - 10:1
 ![Ellipsoid plots](images/figureEight_10-1_n=100.png)
 
+
+#### Speed
+
+##### Circle, variation=0.2
+
+| nPoints | EllpsoidsTime / RipsTime | Total time [s] | nbhdSize |
+|---------|--------------------------|----------------|----------|
+| 20      | 1007.7                   | 0.64           | 5        |
+| 50      | 554.58                   | 4.15           | 5        |
+| 100     | 306.33                   | 21.75          | 5        |
+
 <!--
 #### Bottleneck distance 
 ##### Bottleneck distance between ellipsoid and Rips complex
@@ -168,8 +179,7 @@ For 100 points with `nbhdSize=10`, the size of the file to which data is saved c
 
 
 ### Pending:
-- normalise r between rips and ellipsoid complexes (Rips = 2*Ellipsoid)
-- calculate bottleneck distances if there are outliers and if not for both Rips and ellipsoid complexes
+- calculate bottleneck distances if there are outliers and if not for both Rips and ellipsoid complexes for multiple examples
 
 # Acknowledgements
 - Kalisnik, Lesnik - [Finding the Homology of Manifolds using Ellipsoids (2020)](https://arxiv.org/abs/2006.09194) is the inspiration for this project.
