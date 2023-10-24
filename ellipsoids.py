@@ -22,6 +22,8 @@ import json
 from datetime import datetime
 import time
 
+from sys import getsizeof
+
 class Ellipsoid:
     def __init__(self, center, axes, axesLengths):
         self.center = center
@@ -85,6 +87,32 @@ def createData(nPoints, type, variation = 0.1, dim=2, outliers=False):
 
     elif type == 'sphere':
         r = 1
+
+    elif type == 'torus':
+        r = 1
+        R = 2
+
+        nPtsSampled = 0
+        theta = np.zeros([nPoints])
+        phi = np.zeros([nPoints])
+
+        # rejection sampling
+        while nPtsSampled < nPoints:
+            thetaSample = 2 * np.pi * np.random.rand()
+            phiSample = 2 * np.pi * np.random.rand()
+            W = 2 * np.pi * np.random.rand()
+
+            if W <= (R + r * np.cos(thetaSample))/(R+r):
+                theta[nPtsSampled] = thetaSample
+                phi[nPtsSampled] = phiSample
+                nPtsSampled += 1
+
+
+            x = (R + r * np.cos(theta)) * np.cos(phi)
+            y = (R + r * np.cos(theta)) * np.sin(phi)
+            z = r * np.sin(theta)
+
+        output = np.vstack((x,y,z)).transpose()
         
 
     else:
@@ -433,17 +461,21 @@ def visualisation(**kwargs):
     print('Generating plots...')
 
     points = kwargs['points']
+    print('size of 1 point = ' + str(getsizeof(points[1])))
     dim = len(points[0,:])
+    expansionDim = 3 #
     simplexTreeEllipsoids = kwargs['simplexTreeEllipsoids']
-    #simplexTreeEllipsoids.expansion(dim)
+    simplexTreeEllipsoids.expansion(expansionDim)
     # simplexTreeRips = kwargs['simplexTreeRips']
     ripsComplex = gd.RipsComplex(points=points)
-    simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
+    simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=expansionDim)
     barcodeEllipsoids = kwargs['barcodeEllipsoids']
     barcodeRips = kwargs['barcodeRips']
 
     # plotting ellipsoids (only if 2- or 3-dimensional)
-    if dim == 2 or dim == 3:
+    # if len(points) < 50 and (dim == 2 or dim == 3):
+    plotPoints = False
+    if plotPoints and (dim == 2 or dim == 3):
         fig = plt.figure(figsize=(14,7))
         gs = fig.add_gridspec(2,2)
         if dim == 2:
@@ -469,8 +501,8 @@ def visualisation(**kwargs):
     else:
         fig = plt.figure(figsize=(14,7))
         gs = fig.add_gridspec(2,1)
-        axBarE = fig.add_subplot(gs[0, 1])
-        axBarR = fig.add_subplot(gs[1, 1])
+        axBarE = fig.add_subplot(gs[0, 0])
+        axBarR = fig.add_subplot(gs[1, 0])
 
 
     if 'filename' in kwargs:
@@ -488,12 +520,20 @@ def visualisation(**kwargs):
 
     # alt20230927_2: ellipsoid simplex filtration is 2r so that it's comparable to Rips
     # plotting barcodes
-    xAxisEnd = max(maxFiltration(simplexTreeEllipsoids), maxFiltration(simplexTreeRips)) + 0.1
+    print('Determining the xAxisLength... ', end='', flush=True)
+    # xAxisEnd = max(maxFiltration(simplexTreeEllipsoids), maxFiltration(simplexTreeRips)) + 0.1
+    xAxisEnd = 5
+    print('Done')
+    print('Plotting ellipsoid barcode... ', end='', flush=True)
     barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
                                              axis_start = -0.1, infinity = xAxisEnd) #(0.1 + xAxisEnd) /2 ) # todo: put this back to xAxisEnd (without /2)
+    print('Done.')
     axBarE.set_title('Ellipsoid barcode', fontsize=12)
+
+    print('Plotting Rips barcode... ', end='', flush=True)
     barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
                                              axis_start = -0.1, infinity = xAxisEnd) #(0.1 + xAxisEnd))
+    print('Done.')
     axBarR.set_title('Rips barcode', fontsize=12)
     # /alt
 
@@ -575,51 +615,68 @@ def main():
     tStart = time.time()
 
     ###### User input ######
-    boolSaveData = False
+    boolSaveData = True
     boolShowPlot = True
-    boolSavePlot = False
+    boolSavePlot = True
     rPlot = 0.7            # if rPlot = 0, ellipses won't be plotted
+    expansionDim = 3
     # -------------------- #
     dim = 2              # dimension of the ambient space
     rStart = 0.1
     rEnd = 4
     rStep = 0.1
     rValues = np.arange(rStart, rEnd, rStep)
-    nbhdSize = 10         # number of points for doing PCA
-    nPts = 100            # number of data points
-    axesRatios = np.array([2,1])
+    nbhdSize = 5         # number of points for doing PCA
+    nPts = 500            # number of data points
+    axesRatios = np.array([2,1,1])
     # --------------------- #
     #   Specifying points   #
 
+    dataType = 'unknown_'
+
     # 2d circle, ellipse:
-    points = createData(nPts,'circle', variation = 0.2)
+    # variation = 0.2
+    # points = createData(nPts,'circle', variation = variation)
+    # dataType = 'circle-var' + str(variation) + '_'
+
     # points = createData(nPts,'circle', outliers = False)
+
+    # torus in R3:
+    # points = createData(nPts, 'torus')
+    # dataType = 'torus_'
 
     # more advanced circle, annulus (also in higher dimensions):
     # points = shapes.sample_from_sphere(n=nPts, d=(dim-1), seed=0)
 
     # figure eight:
     # points = figure_eight.figure_eight(nPts, 1, 0.1)
+    # dataType = 'figureEight_'
 
     # to read in a mesh from an OFF file:
-    # points = readOFF('data/61.off') # warning: 61.off is a mesh with 1k+ vertices.
+    # meshFileName = '61.off'
+    # points = readOFF('data' + meshFileName) # warning: 61.off is a mesh with 1k+ vertices.
+    # dataType = 'mesh_' + str(meshFileName)
     
     # to read in the CycloOctane dataset:
-    # points = np.asarray(\
-    #     scipy.io.loadmat('pointsCycloOctane.mat')['pointsCycloOctane']) # size: 6040 x 24
-    # points = points[1:200,:]
-    # # scipy.io.savemat('data/cyclooctane.mat', {'points': points})
-    # dim = 24
-    # nbhdSize = 26
-    # axesRatios = np.ones([dim,1])
+    points = np.asarray(\
+        scipy.io.loadmat('pointsCycloOctane.mat')['pointsCycloOctane']) # size: 6040 x 24
+    dataType = 'cyclooctane'
+    points = points[0:nPts,:]
+    # scipy.io.savemat('data/cyclooctane.mat', {'points': points})
+    dim = 24
+    nbhdSize = 26
+    axesRatios = np.pad(axesRatios, (0,dim - len(axesRatios)), constant_values=1) # creates an array of length dim
     ########################
 
     rStart = rValues[0]
     rEnd = rValues[-1]
     rStep = 0 if len(rValues) == 1 else abs(rValues[1] - rValues[0])
     nPts = len(points)
+    dim = len(points[0])
+    if len(axesRatios) != dim:
+        raise ValueError('The number of ellipsoid axes does not correspond to the ambient dimension.')
     
-    importantParameters = f'{nPts=}' + '_'+ f'{rStep=}' + '_' + f'{nbhdSize=}'
+    importantParameters = f'{dataType=}' + '_' + f'{nPts=}' + '_' + f'{nbhdSize=}' + f'{axesRatios}'
     dataPlotFilename='data/ellipsoids_'+importantParameters+datetime.now().strftime("_%Y%m%d_%H%M%S")
     
     if (boolShowPlot or boolSavePlot) and (rPlot not in rValues):
@@ -629,8 +686,12 @@ def main():
 
     tStartEllipsoids = time.time()    # for testing performace
 
+    print('Creating KD tree... ', end='', flush=True)
     kdTree = spatial.KDTree(points)
+    print('Done.')
+    print('Fitting ellipsoids... ', end='', flush=True)
     ellipsoidList = fitEllipsoids(dim, kdTree, nbhdSize, axesRatios)
+    print('Done.')
     longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipsoidList)
     queryRadius = 2*longestEllipsoidAxis
     # original:
@@ -646,23 +707,32 @@ def main():
     #             "neighbourhood size (nbhdSize) and try again.")
     #     return 0
     #debug:
+    print('Generating ellipsoid simplex tree... ', end='', flush=True)
     simplexTreeEllipsoids = generateEllipoidSimplexTree2(kdTree, ellipsoidList, axesRatios)
+    print('Done.')
     # ----
 
     simplexTreeEllipsoidsExpanded = simplexTreeEllipsoids.copy()
-    simplexTreeEllipsoidsExpanded.expansion(dim) # expands the simplicial complex to include 
+    print('Expanding the ellipsoid simplex tree... ', end='', flush=True)
+    simplexTreeEllipsoidsExpanded.expansion(expansionDim) # expands the simplicial complex to include 
                                         # dim-dimensional simplices whose 1-skeleton is in simplexTree
+    print('Done.')
+    print('Calculating the persistence of the expanded simplex tree... ', end='', flush=True)
     barcodeEllipsoids = simplexTreeEllipsoidsExpanded.persistence()
+    print('Done.')
     
     tEndEllipsoids = time.time()
-
     tStartRips = time.time()
 
+    print('Creating the Rips complex... ', end='', flush=True)
     ripsComplex = gd.RipsComplex(points=points)
-    simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=dim)
+    print('Done.')
+    print('Creating the Rips simplex tree... ', end='', flush=True)
+    simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=expansionDim)
+    print('Done.')
+    print('Calculating the Rips barcode... ', end='', flush=True)
     barcodeRips = simplexTreeRips.persistence()
-    # for entry in simplexTreeRips.persistence_intervals_in_dimension(0):
-    #     print(entry)
+    print('Done.')
 
     tEndRips = time.time()
 
@@ -677,9 +747,10 @@ def main():
 
     tEnd = time.time()
 
-    print('The total execution time is ' + str(tEnd-tStart))
+    print('\nThe total execution time is ' + str(tEnd-tStart) + '\n')
     
     if boolSaveData is True:
+        print('Saving data to file... ', end='', flush=True)
         # debug:
         # barcodeRips1 = barcodeRips
         # barcodeRips = [0,[0,1]]
