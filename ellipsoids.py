@@ -200,6 +200,7 @@ def plotEllipsoids(ellipsoidList, r, axes=None):
 def ellipsoidIntersection(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, r):
     ''' Checks whether ellipsoid1 and ellipsoid2 at the filtration level r intersect.
     The method is from https://math.stackexchange.com/questions/1114879/detect-if-two-ellipses-intersect
+    i.e. this paper: https://tisl.cs.toronto.edu/publication/201207-fusion-kalman_filter_fault_detection/fusion12-kalman_filter_fault_detection.pdf
     :return: true or false
     '''
     Sigma_A = np.linalg.multi_dot([\
@@ -322,17 +323,6 @@ def generateEllipoidSimplexTree2(points, nbhdSize, axesRatios):
     print('Done.')
     return [simplexTree, ellipsoidList]
 
-def calculateEllipsoidBarcode(simplexTreeEllipsoids, expansionDim):
-    simplexTreeEllipsoidsExpanded = simplexTreeEllipsoids.copy()
-    print('Expanding the ellipsoid simplex tree... ', end='', flush=True)
-    simplexTreeEllipsoidsExpanded.expansion(expansionDim) # expands the simplicial complex to include 
-                                        # dim-dimensional simplices whose 1-skeleton is in simplexTree
-    print('Done.')
-    print('Calculating the ellipsoids barcode... ', end='', flush=True)
-    barcodeEllipsoids = simplexTreeEllipsoidsExpanded.persistence()
-    print('Done.')
-    return barcodeEllipsoids
-
 def generateRipsSimplexTree(points):
     print('Creating the Rips complex... ', end='', flush=True)
     ripsComplex = gd.RipsComplex(points=points)
@@ -342,16 +332,16 @@ def generateRipsSimplexTree(points):
     print('Done.')
     return simplexTreeRips
 
-def calculateRipsBarcode(simplexTreeRips, expansionDim):
-    simplexTreeRipsExpanded = simplexTreeRips.copy()
-    print('Expanding the ellipsoid simplex tree... ', end='', flush=True)
-    simplexTreeRipsExpanded.expansion(expansionDim) # expands the simplicial complex to include 
+def expandTreeAndCalculateBarcode(simplexTree, expansionDim):
+    simplexTreeExpanded = simplexTree.copy()
+    print('Expanding the simplex tree... ', end='', flush=True)
+    simplexTreeExpanded.expansion(expansionDim) # expands the simplicial complex to include 
                                         # dim-dimensional simplices whose 1-skeleton is in simplexTree
     print('Done.')
-    print('Calculating the Rips barcode... ', end='', flush=True)
-    barcodeRips = simplexTreeRipsExpanded.persistence()
+    print('Calculating the barcode of the expanded tree... ', end='', flush=True)
+    barcode = simplexTreeExpanded.persistence()
     print('Done.')
-    return barcodeRips
+    return barcode
 
 def plotSimplexTree(points, simplexTree, r, axes):
     dim = len(points[0])
@@ -485,7 +475,7 @@ def loadVarsFromFile(filename):
         vars['simplexTreeEllipsoids'] = simplexTreeEllipsoids
 
     if 'simplexTreeRips' in jsonVars:        
-        simplexTreeRipsRaw = jsonVars['simplexTreeEllipsoids']
+        simplexTreeRipsRaw = jsonVars['simplexTreeRips']
         simplexTreeRips = gd.SimplexTree()
         for simplexTreeEntry in simplexTreeRipsRaw:
             simplexTreeRips.insert(simplexTreeEntry[0],simplexTreeEntry[1])
@@ -502,10 +492,7 @@ def loadVarsFromFile(filename):
 def visualisation(**kwargs):
     print('Generating plots...')
 
-
     xAxisEnd = kwargs['xAxisEnd']
-    points = kwargs['points']
-    dim = len(points[0])
     barcodeEllipsoids = kwargs['barcodeEllipsoids']
     barcodeRips = kwargs['barcodeRips']
 
@@ -524,6 +511,8 @@ def visualisation(**kwargs):
                         'filename']
     
     if set(listOfPlotPointsVars).issubset(kwargs): 
+        points = kwargs['points']
+        dim = len(points[0])
         expansionDim = kwargs['expansionDim']
         simplexTreeEllipsoids = kwargs['simplexTreeEllipsoids']
         simplexTreeEllipsoids.expansion(expansionDim)
@@ -581,6 +570,7 @@ def visualisation(**kwargs):
         plt.show()
 
 def reduceBarcode(barcode, nBarsDim0 = 1, nBarsDim1 = 0, nBarsDim2 = 0):
+    # return only nBarsDimk longest bars in each dimension k
     reducedBarcode = []
     maxBarEnd = 0
     for bar in barcode:
@@ -605,6 +595,29 @@ def reduceBarcode(barcode, nBarsDim0 = 1, nBarsDim1 = 0, nBarsDim2 = 0):
     
     return reducedBarcode, maxBarEnd
 
+def recalculateBarcodesFromFile(filename,expansionDim=2):
+    print('Reading in the variables... ', end='', flush=True)
+    vars = loadVarsFromFile(filename)
+    if 'expansionDim' in vars and vars['expansionDim'] == expansionDim:
+        print('The original barcode is already expanded to the specified dimension.')
+        return None
+    simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
+    simplexTreeRips = vars['simplexTreeRips']
+    print('Done.')
+    
+    barcodeEllipsoids = expandTreeAndCalculateBarcode(simplexTreeEllipsoids, expansionDim)
+    barcodeRips = expandTreeAndCalculateBarcode(simplexTreeRips, expansionDim)
+    
+    dictOfVars = {
+        'originalFile': filename, 
+        'expansionDim': expansionDim,
+        'barcodeEllipsoids': barcodeEllipsoids,
+        'barcodeRips': barcodeRips
+    }
+
+    filename =  filename[:filename.rfind('.')] + '-barcodes_expansionDim=' + f'{expansionDim}' + datetime.now().strftime("_%Y%m%d_%H%M%S") + '.json'
+    saveVarsToFile(dictOfVars, filename=filename)
+
 def visualisationFromFile(\
         filename, \
         nBarsDim0=1, nBarsDim1=0, nBarsDim2=0, \
@@ -613,13 +626,9 @@ def visualisationFromFile(\
 
     print('Reading in the variables... ', end='', flush=True)
     vars = loadVarsFromFile(filename)
-    simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
-    simplexTreeRips = vars['simplexTreeRips']
-    points = vars['points']
     barcodeEllipsoids = vars['barcodeEllipsoids']
     barcodeRips = vars['barcodeRips']
     print('Done.')
-
 
     print('Calculating the reduced barcodes... ', end='', flush=True)
     reducedBarcodeEllipsoids, maxBarEndEllipsoids = reduceBarcode( \
@@ -638,8 +647,11 @@ def visualisationFromFile(\
     barcodeRips = reducedBarcodeRips
     xAxisEnd = max(maxBarEndEllipsoids, maxBarEndRips)
 
-    print('Plotting the ')
+    print('Plotting...')
     if plotEllipsoids is True:
+        simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
+        simplexTreeRips = vars['simplexTreeRips']
+        points = vars['points']
         visualisation(points = points,\
                     ellipsoidList = vars['ellipsoidList'], \
                     rPlot = rPlot, \
@@ -651,7 +663,7 @@ def visualisationFromFile(\
                     savePlot = False
                     )
     else:
-        visualisation(points = points,\
+        visualisation( \
                     xAxisEnd = xAxisEnd, \
                     barcodeEllipsoids = barcodeEllipsoids, \
                     barcodeRips = barcodeRips, \
@@ -689,10 +701,6 @@ def calculateBottleeckDistance(barcode1, barcode2, dim):
         npBarcode2[line[0]].append(line[1])
 
     bottleneckDistance = [gd.bottleneck_distance(i,j) for i,j in zip(npBarcode1, npBarcode2)]
-
-    return bottleneckDistance
-    # TODO: finish this
-    pass
 
 
 
@@ -748,20 +756,23 @@ def main(nPts):
     nbhdSize = 26
     ########################
 
+    # depending on the type of data used, it might be necessary to read these in again
     nPts = len(points)
     dim = len(points[0])
+
+    # filling out axesRatios in case only the first few terms are specified
     axesRatios = np.pad(axesRatios, (0,dim - len(axesRatios)), constant_values=1) # creates an array of length dim
     if len(axesRatios) != dim:
         raise ValueError('The number of ellipsoid axes does not correspond to the ambient dimension.')
 
     tStartEllipsoids = time.time()    # for testing performace
     [simplexTreeEllipsoids, ellipsoidList] = generateEllipoidSimplexTree2(points, nbhdSize, axesRatios)
-    barcodeEllipsoids = calculateEllipsoidBarcode(simplexTreeEllipsoids, expansionDim)
+    barcodeEllipsoids = expandTreeAndCalculateBarcode(simplexTreeEllipsoids, expansionDim)
     tEndEllipsoids = time.time()
 
     tStartRips = time.time()
     simplexTreeRips = generateRipsSimplexTree(points)
-    barcodeRips = calculateRipsBarcode(simplexTreeRips, expansionDim)
+    barcodeRips = expandTreeAndCalculateBarcode(simplexTreeRips, expansionDim)
     tEndRips = time.time()
 
     tEllipsoids = tEndEllipsoids - tStartEllipsoids
@@ -771,13 +782,14 @@ def main(nPts):
     tTotal = tEnd - tStart
 
     print('\nThe total execution time is ' + str(tEnd-tStart) + '\n')
-    importantParameters = f'{dataType=}' + '_' + f'{nPts=}' + '_' + f'{nbhdSize=}' + f'{axesRatios}'
+    importantParameters = 'dataType=' + f'{dataType}' + '_' + f'{nPts=}' + '_' + f'{nbhdSize=}' + f'{axesRatios}'
     dataPlotFilename='data/ellipsoids_'+importantParameters+datetime.now().strftime("_%Y%m%d_%H%M%S")
 
     if boolSaveData is True:
         print('Saving data to file... ', end='', flush=True)
         dictOfVars = {
             'dim': dim,
+            'expansionDim': expansionDim,
             'nbhdSize': nbhdSize,
             'nPts': nPts,
             'totalExecutionTime': tTotal,
@@ -796,7 +808,7 @@ def main(nPts):
         xAxisEnd = max(maxFiltration(simplexTreeEllipsoids), maxFiltration(simplexTreeRips)) + 0.1
         if dim > 3: boolPlotPoints = False
         
-        if boolPlotPoints is True:
+        if boolPlotPoints is True:                  # plotting points, ellipsoids, and the barcodes
             visualisation(
                         points = points,\
                         xAxisEnd = xAxisEnd,\
@@ -811,8 +823,8 @@ def main(nPts):
                         showPlot = boolShowPlot, \
                         savePlot = boolSavePlot, \
                         filename = dataPlotFilename + '.png')
-        else:
-            visualisation(
+        else:                                       # plotting just the barcodes
+            visualisation(  
                         points = points,\
                         xAxisEnd = xAxisEnd,\
                         barcodeEllipsoids = barcodeEllipsoids, \
