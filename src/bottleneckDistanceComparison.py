@@ -1,4 +1,4 @@
-from ellipsoids import loadVarsFromFile
+from readWriteData import loadVarsFromFile
 import gudhi as gd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -53,9 +53,9 @@ def plotDistances(distanceEllipsoids, distanceRips):
 
 def main():
     filename1 = \
-        'data/ellipsoids_nPts=50_rStep=0.1_nbhdSize=5_20230927_145605.json'
+        '../data/ellipsoids_nPts=50_rStep=0.1_nbhdSize=5_20230927_145605.json'
     filename2 = \
-        'data/ellipsoids_nPts=50_rStep=0.1_nbhdSize=5_20230927_144941.json'
+        '../data/ellipsoids_nPts=50_rStep=0.1_nbhdSize=5_20230927_144941.json'
     [distanceEllipsoids, distanceRips] = calculateBottleneckDistances(filename1,filename2)
     plotDistances(distanceEllipsoids, distanceRips)
 

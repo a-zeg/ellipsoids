@@ -120,11 +120,11 @@ def createData(nPoints, type, variation = 0.1, dim=2, outliers=False):
     
     return output
 
-def fitEllipsoid(dim, center, neighbourhood, axesRatios=0):
+def fitEllipsoid(center, neighbourhood, axesRatios=0):
     ''' Use PCA to fit an ellipsoid to the given neighbourhood
     :return: ellipsoid of dimension dim with axes obtained from PCA
     '''
-    pca = PCA(n_components=dim)
+    pca = PCA(n_components=len(center))
     pca.fit(neighbourhood)
     axes = pca.components_
     axesLengths = pca.singular_values_
@@ -135,17 +135,23 @@ def fitEllipsoid(dim, center, neighbourhood, axesRatios=0):
         # /alt
     return Ellipsoid(center, axes, axesLengths)
 
-def fitEllipsoids(dim, kdTree, neighbourhoodSize, axesRatios = 0):
-    points = kdTree.data
-    nPoints = len(points)
-    ellipseList = []
-    for point in points:
-        [NULL,neighbourhoodIdx] = kdTree.query(point, min(nPoints,neighbourhoodSize))
-        neighbourhood = points[neighbourhoodIdx]
-        currentEllipsoid = fitEllipsoid(dim, point, neighbourhood, axesRatios)
-        ellipseList.append(currentEllipsoid)
-    return ellipseList
+def fitEllipsoids(points, neighbourhoodSize, axesRatios = 0):
 
+    print('Creating KD tree... ', end='', flush=True)
+    kdTree = spatial.KDTree(points)
+    print('Done.')
+    print('Fitting ellipsoids... ', end='', flush=True)
+
+    if len(points) < neighbourhoodSize:
+        neighbourhoodSize = len(points)
+
+    _,neighbourhoodIdx = kdTree.query(points, neighbourhoodSize)
+    neighbourhoods = points[neighbourhoodIdx]
+    ellipsoidList \
+        = [fitEllipsoid(point, neighbourhood, axesRatios) for point,neighbourhood in zip(points, neighbourhoods)]
+    print('Done.')
+
+    return ellipsoidList
 
 def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     sampleRate = 100
@@ -274,16 +280,10 @@ def generateEllipoidSimplexTree2(points, nbhdSize, axesRatios):
 
     :return: gudhi.SimplexTree
     '''
-    dim = len(points[0])
-    print('Creating KD tree... ', end='', flush=True)
-    kdTree = spatial.KDTree(points)
-    print('Done.')
-    print('Fitting ellipsoids... ', end='', flush=True)
-    ellipsoidList = fitEllipsoids(dim, kdTree, nbhdSize, axesRatios)
-    print('Done.')
+    
+    ellipsoidList = fitEllipsoids(points, nbhdSize, axesRatios)
     longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipsoidList)
 
-    nPoints = len(points)
     simplexTree = gd.SimplexTree()
     distanceMatrix = spatial.distance.squareform(spatial.distance.pdist(points))
     threshold = 0.001
@@ -291,15 +291,15 @@ def generateEllipoidSimplexTree2(points, nbhdSize, axesRatios):
 
     print('Calculating ellipsoid simplex tree... ', end='', flush=True)
 
+    nPoints = len(points)
     for i in range(nPoints):
         simplexTree.insert([i], 0)
-        for j in range(i+1,nPoints):
+        for j in range(i+1,nPoints): # j goes from i+1 so as to check for intersections only once per pair of ellipsoids
             dist = distanceMatrix[i,j]
             if axesRatios.all() != 0:
                 maxNonIntersectionFiltration = (dist / 2) - epsilon
                 minIntersectionFiltration = dist/2 * max(axesRatios) + epsilon
             else:
-                longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipsoidList)
                 maxNonIntersectionFiltration = (dist / 2) - epsilon
                 minIntersectionFiltration = dist/2 * longestEllipsoidAxis + epsilon
             # alt20230927: if r should determine the short axis
@@ -414,7 +414,7 @@ class CustomEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
     
 def saveVarsToFile(dictOfVars,
-                   filename=datetime.now().strftime("data/test.json")):
+                   filename=datetime.now().strftime("../data/test.json")):
     print('Saving data to file...')
     json_string = json.dumps(dictOfVars, cls=CustomEncoder, indent=4)
     with open(filename, 'w') as outfile:
@@ -548,7 +548,7 @@ def visualisation(**kwargs):
 
     if 'filename' in kwargs:
         filename = kwargs['filename']
-    else: filename = 'data/plotTest.png'
+    else: filename = '../data/plotTest.png'
 
     print('Plotting ellipsoid barcode... ', end='', flush=True)
     barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
@@ -707,17 +707,17 @@ def calculateBottleeckDistance(barcode1, barcode2, dim):
 def main(nPts):
     tStart = time.time()
     ###### User input ######
-    boolSaveData = True
-    boolShowPlot = False
-    boolSavePlot = True
-    boolPlotPoints = False
-    boolPlotBarcodes = True
+    saveData = True
+    showPlot = False
+    savePlot = True
+    plotPoints = False
+    plotBarcodes = True
     rPlot = 1.2            # if rPlot = 0, ellipses won't be plotted
     expansionDim = 3
     # -------------------- #
-    # dim = 2              # dimension of the ambient space
-    # nbhdSize = 3         # number of points for doing PCA
-    # nPts = 100            # number of data points
+    dim = 2              # dimension of the ambient space
+    nbhdSize = 3         # number of points for doing PCA
+    nPts = 100            # number of data points
     axesRatios = np.array([2,1])
     # --------------------- #
     #   Specifying points   #
@@ -725,8 +725,8 @@ def main(nPts):
     dataType = 'unknown_'
 
     # 2d circle, ellipse:
-    # variation = 0.2
-    # points = createData(nPts,'circle', variation = variation)
+    variation = 0.2
+    points = createData(nPts,'circle', variation = variation)
     # dataType = 'circle-var' + str(variation) + '_'
 
     # points = createData(nPts,'circle', outliers = False)
@@ -748,12 +748,12 @@ def main(nPts):
     # dataType = 'mesh_' + str(meshFileName)
     
     # read in the CycloOctane dataset:
-    points = np.asarray(\
-        scipy.io.loadmat('pointsCycloOctane.mat')['pointsCycloOctane']) # size: 6040 x 24
-    dataType = 'cyclooctane'
-    points = points[0:nPts,:]
-    # scipy.io.savemat('data/cyclooctane.mat', {'points': points})
-    nbhdSize = 26
+    # points = np.asarray(\
+    #     scipy.io.loadmat('pointsCycloOctane.mat')['pointsCycloOctane']) # size: 6040 x 24
+    # dataType = 'cyclooctane'
+    # points = points[0:nPts,:]
+    # # scipy.io.savemat('data/cyclooctane.mat', {'points': points})
+    # nbhdSize = 26
     ########################
 
     # depending on the type of data used, it might be necessary to read these in again
@@ -783,9 +783,9 @@ def main(nPts):
 
     print('\nThe total execution time is ' + str(tEnd-tStart) + '\n')
     importantParameters = 'dataType=' + f'{dataType}' + '_' + f'{nPts=}' + '_' + f'{nbhdSize=}' + f'{axesRatios}'
-    dataPlotFilename='data/ellipsoids_'+importantParameters+datetime.now().strftime("_%Y%m%d_%H%M%S")
+    dataPlotFilename='../data/ellipsoids_'+importantParameters+datetime.now().strftime("_%Y%m%d_%H%M%S")
 
-    if boolSaveData is True:
+    if saveData is True:
         print('Saving data to file... ', end='', flush=True)
         dictOfVars = {
             'dim': dim,
@@ -804,11 +804,11 @@ def main(nPts):
         saveVarsToFile(dictOfVars, \
                        filename = dataPlotFilename + '.json')
         
-    if (boolShowPlot or boolSavePlot) is True:
+    if (showPlot or savePlot) is True:
         xAxisEnd = max(maxFiltration(simplexTreeEllipsoids), maxFiltration(simplexTreeRips)) + 0.1
-        if dim > 3: boolPlotPoints = False
+        if dim > 3: plotPoints = False
         
-        if boolPlotPoints is True:                  # plotting points, ellipsoids, and the barcodes
+        if plotPoints is True:                  # plotting points, ellipsoids, and the barcodes
             visualisation(
                         points = points,\
                         xAxisEnd = xAxisEnd,\
@@ -818,10 +818,10 @@ def main(nPts):
                         simplexTreeRips = simplexTreeRips, \
                         barcodeEllipsoids = barcodeEllipsoids, \
                         barcodeRips = barcodeRips, \
-                        plotPoints = boolPlotPoints, \
-                        plotBarcodes = boolPlotBarcodes, \
-                        showPlot = boolShowPlot, \
-                        savePlot = boolSavePlot, \
+                        plotPoints = plotPoints, \
+                        plotBarcodes = plotBarcodes, \
+                        showPlot = showPlot, \
+                        savePlot = savePlot, \
                         filename = dataPlotFilename + '.png')
         else:                                       # plotting just the barcodes
             visualisation(  
@@ -829,13 +829,13 @@ def main(nPts):
                         xAxisEnd = xAxisEnd,\
                         barcodeEllipsoids = barcodeEllipsoids, \
                         barcodeRips = barcodeRips, \
-                        showPlot = boolShowPlot, \
-                        savePlot = boolSavePlot, \
+                        showPlot = showPlot, \
+                        savePlot = savePlot, \
                         filename = dataPlotFilename + '.png') 
         
 
 if __name__ == "__main__":
-    nPtsValues = np.array([100, 200, 300, 400, 500, 800, 1000])
+    nPtsValues = np.array([100])#, 200, 300, 400, 500, 800, 1000])
     for nPts in nPtsValues:
         main(nPts)
 
