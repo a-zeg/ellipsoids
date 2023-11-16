@@ -3,6 +3,7 @@ import gudhi as gd
 from datetime import datetime
 from ellipsoidSimplexTree import Ellipsoid
 import numpy as np
+import os
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -19,13 +20,35 @@ class CustomEncoder(json.JSONEncoder):
         elif isinstance(obj,gd.SimplexTree):
             return list(obj.get_filtration())
         return json.JSONEncoder.default(self, obj)
-    
+
 def saveVarsToFile(dictOfVars,
                    filename=datetime.now().strftime("data/test.json")):
     print('Saving data to file...')
     json_string = json.dumps(dictOfVars, cls=CustomEncoder, indent=4)
     with open(filename, 'w') as outfile:
         outfile.write(json_string)
+    print("Data saved to file " + filename + '.')
+
+def saveVarsToFile2(dictOfVars,
+                   filename=datetime.now().strftime("data/test.json"), 
+                   addToStart=False):
+    print('Saving data to file...')
+    json_string = json.dumps(dictOfVars, cls=CustomEncoder, indent=4)
+    if os.path.exists(filename): # if the file already exists, append to it
+        if addToStart:
+            index = 0
+            with open(filename, "r") as f:
+                contents = f.readlines()
+            contents.insert(index, dictOfVars)
+            with open(filename, "w") as f:
+                contents = "".join(str(c) for c in contents)
+                f.write(contents)
+        else:
+            with open(filename, "a") as f:
+                f.write(json_string)
+    else:
+        with open(filename, 'w') as outfile:
+            outfile.write(json_string)
     print("Data saved to file " + filename + '.')
 
 def loadVarsFromFile(filename):

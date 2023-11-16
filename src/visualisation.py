@@ -5,7 +5,7 @@ import barcodePlotting
 import gudhi as gd
 from readWriteData import loadVarsFromFile
 from utils import reduceBarcode
-
+from datetime import datetime
 
 def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     sampleRate = 100
@@ -160,7 +160,7 @@ def visualisation(**kwargs):
 
     if 'filename' in kwargs:
         filename = kwargs['filename']
-    else: filename = '../data/plotTest.png'
+    else: filename = 'data/plotTest.png'
 
     print('Plotting ellipsoid barcode... ', end='', flush=True)
     barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
@@ -185,7 +185,8 @@ def visualisationFromFile(\
         filename, \
         nBarsDim0=1, nBarsDim1=0, nBarsDim2=0, \
         rPlot=0.6, \
-        plotEllipsoids=False):
+        plotEllipsoids=False, \
+        savePlot=False):
 
     print('Reading in the variables... ', end='', flush=True)
     vars = loadVarsFromFile(filename)
@@ -208,9 +209,12 @@ def visualisationFromFile(\
 
     barcodeEllipsoids = reducedBarcodeEllipsoids
     barcodeRips = reducedBarcodeRips
-    xAxisEnd = max(maxBarEndEllipsoids, maxBarEndRips)
+    xAxisEnd = max(maxBarEndEllipsoids, maxBarEndRips) * 1.1
 
     print('Plotting...')
+
+    filename = filename[:filename.rfind('.')] + '-barcodesDim=0:' + f'{nBarsDim0}' + '_1:' + f'{nBarsDim1}' + '_2:' + f'{nBarsDim2}' + datetime.now().strftime("_%Y%m%d_%H%M%S") + '.json'
+
     if plotEllipsoids is True:
         simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
         simplexTreeRips = vars['simplexTreeRips']
@@ -223,7 +227,7 @@ def visualisationFromFile(\
                     barcodeRips = barcodeRips, \
                     xAxisEnd = xAxisEnd, \
                     showPlot = True, \
-                    savePlot = False
+                    savePlot = savePlot
                     )
     else:
         visualisation( \
@@ -231,5 +235,5 @@ def visualisationFromFile(\
                     barcodeEllipsoids = barcodeEllipsoids, \
                     barcodeRips = barcodeRips, \
                     showPlot = True, \
-                    savePlot = False, \
+                    savePlot = savePlot, \
                     )

@@ -81,10 +81,15 @@ def importPoints(nPts, dataType='circle', dim=2, variation=0.1, outliers=False, 
     match dataType:
         case 'circle':
             return createData(nPts, 'circle', variation=variation, outliers=outliers)
+        case 'sphere':
+            vec = np.random.randn(dim, nPts)
+            vec /= np.linalg.norm(vec, axis=0)
+            return vec.transpose()
+            return shapes.sample_from_sphere(n=nPts, d=(dim-1), seed=0)
         case 'torus':
             return createData(nPts, 'torus')
         case 'annulus':
-            return shapes.sample_from_sphere(n=nPts, d=(dim-1), seed=0)
+            return shapes.sample_from_annulus(n=nPts, r=0.4, R=1, seed=0)
         case 'figureEight':
             return figure_eight.figure_eight(nPts, 1, 0.1)
         case 'mesh':

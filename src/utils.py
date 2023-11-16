@@ -20,9 +20,13 @@ def expandTreeAndCalculateBarcode(simplexTree, expansionDim, collapseEdges=False
     simplexTreeExpanded.expansion(expansionDim) # expands the simplicial complex to include 
                                                 # dim-dimensional simplices whose 1-skeleton is in simplexTree
     print('Done.')
+    # ###
+    # print('Number of simplices is ' + str(simplexTreeExpanded.num_simplices()))
+    # ###
     print('Calculating the barcode of the expanded tree... ', end='', flush=True)
     barcode = simplexTreeExpanded.persistence()
     print('Done.')
+
     return barcode
 
 def maxFiltration(simplexTree):
@@ -72,8 +76,12 @@ def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
     if 'expansionDim' in vars and vars['expansionDim'] == expansionDim:
         print('The original barcode is already expanded to the specified dimension.')
         return None
-    simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
-    simplexTreeRips = vars['simplexTreeRips']
+    if 'simplexTreeEllipsoids' in vars:
+        simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
+    else: simplexTreeEllipsoids = gd.SimplexTree()
+    if 'simplexTreeRips' in vars:
+        simplexTreeRips = vars['simplexTreeRips']
+    else: simplexTreeRips = gd.SimplexTree()
     print('Done.')
     
     barcodeEllipsoids = expandTreeAndCalculateBarcode(simplexTreeEllipsoids, expansionDim, collapseEdges=collapseEdges)
