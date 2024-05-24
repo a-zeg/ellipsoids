@@ -8,6 +8,32 @@
 </div>
 
 
+# Update 20240524
+
+The turkevs-experiments part of the code is currently organised as follows:
+
+The file that is used to compare accuracies of ellipsoids and other algorithms is `turkevs_holes_experiment.py`.
+
+If you run it as-is with the folder structure currently on GitHub, it should fail after a few minutes with the error
+```
+File "/usr/local/lib/python3.11/site-packages/sklearn/base.py", line 414, in _check_n_features
+    raise ValueError(
+ValueError: X has 78 features, but SVC is expecting 85 features as input.
+
+```
+
+Otherwise, if you want to run it with different datasets, the ellipsoids barcodes need to be precalculated.
+
+The pipeline is:
+1. Run `generate_turkevs` to generate point clouds using Renata Turkes's code and save them in a `pkl` file.
+2. Run `calculate_turkevs` to calculate the ellipsoids barcodes and save them in `json` files. There is one `json` file per point cloud, so hundreds of `json` files might be generated.
+3. Run `turkevs_holes_experiment.py`. It is necessary to specify where the `json` files are located (and the `id` corresponding to the dataset).
+
+
+
+Most stuff below is no longer applicable, I'll make a nice up-to-date README at some point.
+
+
 
 <!-- TABLE OF CONTENTS -->
 <details>
@@ -195,9 +221,6 @@ are:
 ![Bottleneck distance](images/bottleneckdistance_circle_outliers.png)
 
 
-
-### Pending:
-- calculate bottleneck distances if there are outliers and if not for both Rips and ellipsoid complexes for multiple examples
 
 # Acknowledgements
 - Kalisnik, Lesnik - [Finding the Homology of Manifolds using Ellipsoids (2020)](https://arxiv.org/abs/2006.09194) is the inspiration for this project.

@@ -398,6 +398,12 @@ def plot_persistence_density(
     axes=None,
     fontsize=16,
     greyblock=False,
+    birth_min=None,
+    birth_max=None,
+    death_min=None,
+    death_max=None,
+    colormap=None,
+    highestColor=None
 ):
     """This function plots the persistence density from persistence values list, np.array of shape (N x 2) representing
     a diagram in a single homology dimension, or from a `persistence diagram <fileformats.html#persistence-diagram>`_
@@ -487,10 +493,17 @@ def plot_persistence_density(
             # Set as numpy array birth and death (remove undefined values - inf and NaN)
             birth = persistence_dim[:, 0]
             death = persistence_dim[:, 1]
-            birth_min = birth.min()
-            birth_max = birth.max()
-            death_min = death.min()
-            death_max = death.max()
+            print('size' + str(len(persistence_dim)))
+            print(death)
+            #exit()
+            if birth_min is None:
+                birth_min = birth.min()
+            if birth_max is None:
+                birth_max = birth.max()
+            if death_min is None:
+                death_min = death.min()
+            if death_max is None:
+                death_max = death.max()
 
             # Evaluate a gaussian kde on a regular grid of nbins x nbins over data extents
             k = kde.gaussian_kde([birth, death], bw_method=bw_method)
@@ -500,7 +513,10 @@ def plot_persistence_density(
             ]
             zi = k(np.vstack([xi.flatten(), yi.flatten()]))
             # Make the plot
-            img = axes.pcolormesh(xi, yi, zi.reshape(xi.shape), cmap=cmap, shading="auto")
+            if highestColor is None:
+                img = axes.pcolormesh(xi, yi, zi.reshape(xi.shape), cmap=cmap, shading="auto") # changed shading from auto to flat
+            else:
+                img = axes.pcolormesh(xi, yi, zi.reshape(xi.shape), cmap=cmap, shading="auto", vmin=0, vmax=highestColor)
             plot_success = True
 
         # IndexError on empty diagrams, ValueError on only inf death values

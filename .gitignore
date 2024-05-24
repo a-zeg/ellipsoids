@@ -1,5 +1,8 @@
 *.pyc
 .DS_Store
 /sent
-/test
 /data
+/old_202405
+/datasets
+/euler
+/results

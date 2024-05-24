@@ -1,239 +1,262 @@
 import numpy as np
 import time
 from datetime import datetime
-from ellipsoidSimplexTree import generateEllipsoidSimplexTree2
-from ellipsoidSimplexTree import generateEllipsoidSimplexTree3
-from ellipsoidSimplexTree import generateEllipsoidSimplexTree4
-from importPoints import importPoints
-from ripsSimplexTree import generateRipsSimplexTree
-from readWriteData import saveVarsToFile
-from utils import expandTreeAndCalculateBarcode
-from utils import maxFiltration
-from utils import padAxesRatios
-from visualisation import visualisation
-import gudhi as gd
+from topological_computations import calculate_ellipsoid_barcode
+from topological_computations import calculate_rips_barcode
+import data_handling 
+# from ripsSimplexTree import generateRipsSimplexTree
+# from utils import expandTreeAndCalculateBarcode
+# from utils import maxFiltration
+# from utils import padAxesRatios
+from os import listdir
+from os.path import isfile, join
+import os
+# import data_construction
 
-def main(**kwargs):
-    ###### Default parameter values ######
-    saveData = True
-    showPlot = False
-    savePlot = True
-    plotPoints = False
-    plotBarcodes = True
-    collapseEdges = True
-    rPlot = 1.2                                 # if rPlot = 0, ellipses won't be plotted
-    dim = 3                                     # dimension of the ambient space
-    nbhdSize = 5                                # number of points for doing PCA
-    nPts = 100                                  # number of data points
-    expansionDim = 2                            # if expansionDim=3, it takes ages for 300+ points
-    axesRatios = np.array([2,1])
-    dataType = 'circle'
-    #######################################
-    if 'saveData' in kwargs:
-        saveData = kwargs['saveData']
-    if 'showPlot' in kwargs:
-        showPlot = kwargs['showPlot']
-    if 'savePlot' in kwargs:
-        savePlot = kwargs['savePlot']
-    if 'plotPoints' in kwargs:
-        plotPoints = kwargs['plotPoints']
-    if 'plotBarcodes' in kwargs:
-        plotBarcodes = kwargs['plotBarcodes']
-    if 'collapseEdges' in kwargs:
-        collapseEdges = kwargs['collapseEdges']
-    if 'rPlot' in kwargs:
-        rPlot = kwargs['rPlot']
-    if 'dim' in kwargs:
-        dim = kwargs['dim']
-    if 'nbhdSize' in kwargs:
-        nbhdSize = kwargs['nbhdSize']
-    if 'nPts' in kwargs:
-        nPts = kwargs['nPts']
-    if 'expansionDim' in kwargs:
-        expansionDim = kwargs['expansionDim']
-    if 'axesRatios' in kwargs:
-        axesRatios = kwargs['axesRatios']
-    if 'dataType' in kwargs:
-        dataType = kwargs['dataType']
-    # ----------------------------------- #
 
-    if dataType == 'cyclooctane':
-        nbhdSize = 26
 
-    if 'dim' in kwargs:
-        points = importPoints(nPts,dataType=dataType,dim=dim)
-    else:
-        points = importPoints(nPts, dataType=dataType) 
 
-    # depending on the type of data used, it might be necessary to read these in again
-    nPts = len(points)
-    dim = len(points[0])
+def generate_filename(filename_parameters: dict, folder='data', timestamp = ''):
+    '''
+    Generates filename by creating a string from the variables in 
+    filename_parameters and appends the timestamp if the value of 
+    `timestamp` is True.
+    '''
+    filename = 'ellipsoids'
+    for key, value in filename_parameters.items():
+        filename = filename + '_' + key + '=' + str(value)
 
-    # filling out axesRatios in case only the first few terms are specified
-    axesRatios = padAxesRatios(axesRatios, dim)
+    if timestamp != '':
+        filename = filename + '_' + timestamp
 
-    importantParameters = 'dataType=' + f'{dataType}' + '_' + f'{nPts=}' + '_' + f'{nbhdSize=}' + f'{axesRatios=}'
-    dataPlotFilename='data/ellipsoids_'+importantParameters+datetime.now().strftime("_%Y%m%d_%H%M%S")
+    return os.path.join(folder, filename)
 
-    ######### Ellipsoids #########
-    tStart = time.time()
-    tStartEllipsoidsST = time.time()    # for testing performace
-    [simplexTreeEllipsoids, ellipsoidList] = generateEllipsoidSimplexTree4(points, nbhdSize, axesRatios)
-    tEndEllipsoidsST = time.time()
+def set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params: dict):
 
-    if saveData is True:
-        print('Saving data to file... ', end='', flush=True)
-        dictOfVars = {
-            'dim': dim,
-            'expansionDim': expansionDim,
-            'nbhdSize': nbhdSize,
-            'nPts': nPts,
-            'points': points,
-            'ellipsoidList': ellipsoidList,
-            'simplexTreeEllipsoids': simplexTreeEllipsoids
-        }
-        saveVarsToFile(dictOfVars, \
-                        filename = dataPlotFilename + '.json')
+    filename_params = {
+        'data_type': data_type,
+        'n_pts': n_pts,
+        'nbhd_size': nbhd_size,
+        'axes_ratios': axes_ratios,
+    }
 
-    tStartEllipsoidsBarcode = time.time()
-    barcodeEllipsoids = expandTreeAndCalculateBarcode(simplexTreeEllipsoids, expansionDim, collapseEdges=collapseEdges)
-    tEndEllipsoidsBarcode = time.time()
+    filename_params.update(data_type_params)
 
-    if saveData is True:
-        print('Saving data to file... ', end='', flush=True)
-        dictOfVars = {
-            'dim': dim,
-            'expansionDim': expansionDim,
-            'nbhdSize': nbhdSize,
-            'nPts': nPts,
-            'points': points,
-            'ellipsoidList': ellipsoidList,
-            'simplexTreeEllipsoids': simplexTreeEllipsoids,
-            'barcodeEllipsoids': barcodeEllipsoids 
-        }
-        saveVarsToFile(dictOfVars, filename = dataPlotFilename + '.json')
+    return filename_params
 
-    ########### Rips ###########
 
-    tStartRipsST = time.time()
-    simplexTreeRips = generateRipsSimplexTree(points)
-    tEndRipsST = time.time()
+def filter_dictionary(vars_to_save: list[str], dict_all_vars):
 
-    if saveData is True:
-        print('Saving data to file... ', end='', flush=True)
-        dictOfVars = {
-            'dim': dim,
-            'expansionDim': expansionDim,
-            'nbhdSize': nbhdSize,
-            'nPts': nPts,
-            'points': points,
-            'ellipsoidList': ellipsoidList,
-            'simplexTreeEllipsoids': simplexTreeEllipsoids,
-            'barcodeEllipsoids': barcodeEllipsoids,
-            'simplexTreeRips': simplexTreeRips 
-        }
-        saveVarsToFile(dictOfVars, filename = dataPlotFilename + '.json')
+    results = {}
+    for var_name in vars_to_save:
+        if var_name in dict_all_vars:
+            results[var_name] = dict_all_vars[var_name]
+        else: 
+            print('Warning: ' + var_name + ' does not exist in the local variables and will not be saved.')
+    
+    return results
 
-    tStartRipsBarcode = time.time()
-    barcodeRips = expandTreeAndCalculateBarcode(simplexTreeRips, expansionDim, collapseEdges=collapseEdges)
-    tEndRipsBarcode = time.time()
 
-    if saveData is True:
-        print('Saving data to file... ', end='', flush=True)
-        dictOfVars = {
-            'dim': dim,
-            'expansionDim': expansionDim,
-            'nbhdSize': nbhdSize,
-            'nPts': nPts,
-            'points': points,
-            'ellipsoidList': ellipsoidList,
-            'simplexTreeEllipsoids': simplexTreeEllipsoids,
-            'barcodeEllipsoids': barcodeEllipsoids,
-            'simplexTreeRips': simplexTreeRips,
-            'barcodeRips': barcodeRips 
-        }
-        saveVarsToFile(dictOfVars, filename = dataPlotFilename + '.json')
 
-    tEllipsoids = tEndEllipsoidsST - tStartEllipsoidsST + tEndEllipsoidsBarcode - tStartEllipsoidsBarcode
-    tRips = tEndRipsST - tStartRipsST + tEndRipsBarcode - tStartRipsBarcode
-    tRatio = tEllipsoids / tRips
-    tEnd = time.time()
-    tTotal = tEnd - tStart
+def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, expansion_dim, filename):
+    
+    # Specify the names of variables to be saved
+    vars_to_save = [
+        'ambient_dim',
+        'expansion_dim',
+        'nbhd_size',
+        'n_pts',
+        't_total',
+        't_ellipsoids_over_t_rips',
+        'points',
+        'barcode_ellipsoids',
+        'barcode_rips'
+    ]
 
-    print('\nThe total execution time is ' + str(tEnd-tStart) + '\n')
+    if 'ambient_dim' in vars_to_save:
+        ambient_dim = len(points[0])
+    if 'n_pts' in vars_to_save:
+        n_pts = len(points)
 
-    if saveData is True:
-        print('Saving data to file... ', end='', flush=True)
-        dictOfVars = {
-            'dim': dim,
-            'expansionDim': expansionDim,
-            'nbhdSize': nbhdSize,
-            'nPts': nPts,
-            'totalExecutionTime': tTotal,
-            'timeEllipsoids/tRips': tRatio,
-            'points': points,
-            'ellipsoidList': ellipsoidList,
-            'simplexTreeEllipsoids': simplexTreeEllipsoids,
-            'simplexTreeRips': simplexTreeRips,
-            'barcodeEllipsoids': barcodeEllipsoids,
-            'barcodeRips': barcodeRips
-        }
-        saveVarsToFile(dictOfVars, \
-                       filename = dataPlotFilename + '.json')
-        
-    if (showPlot or savePlot) is True:
-        xAxisEnd = max(maxFiltration(simplexTreeEllipsoids), maxFiltration(simplexTreeRips)) + 0.1
-        if dim > 3: plotPoints = False
-        
-        if plotPoints is True:                  # plotting points, ellipsoids, and the barcodes
-            visualisation(
-                        points = points,\
-                        xAxisEnd = xAxisEnd,\
-                        expansionDim = expansionDim, \
-                        ellipsoidList = ellipsoidList, rPlot = rPlot, \
-                        simplexTreeEllipsoids = simplexTreeEllipsoids, \
-                        simplexTreeRips = simplexTreeRips, \
-                        barcodeEllipsoids = barcodeEllipsoids, \
-                        barcodeRips = barcodeRips, \
-                        plotPoints = plotPoints, \
-                        plotBarcodes = plotBarcodes, \
-                        showPlot = showPlot, \
-                        savePlot = savePlot, \
-                        filename = dataPlotFilename + '.png')
-        else:                                       # plotting just the barcodes
-            visualisation(  
-                        points = points,\
-                        xAxisEnd = xAxisEnd,\
-                        barcodeEllipsoids = barcodeEllipsoids, \
-                        barcodeRips = barcodeRips, \
-                        showPlot = showPlot, \
-                        savePlot = savePlot, \
-                        filename = dataPlotFilename + '.png') 
+    # Calculate barcodes for ellipsoids and Rips complexes
+    barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, t_ellipsoids = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
+    barcode_rips, simplex_tree_rips, t_rips = calculate_rips_barcode(points, expansion_dim=expansion_dim)
+
+    # Get the execution time
+    t_ellipsoids_over_t_rips = t_ellipsoids / t_rips
+    t_total = t_ellipsoids + t_rips
+    print('\nThe total execution time is ' + str(t_total) + '\n')
+
+    # Save variables to file
+    params_dict = filter_dictionary(vars_to_save, locals())
+    data_handling.saveVarsToFile(params_dict, filename=filename)
         
 
-if __name__ == "__main__":
+# def get_paths_of_files_in_a_folder(folder, extension='.mat'):
+#     filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(extension)]
+#     paths = [(folder + '/' + f) for f in filenames] 
+#     return paths
+    
 
-    axesRatios = np.array([2,1])
-    expansionDim = 2
-    nPtsValues = np.array([500, 200])
+def main():
 
-    # circles
-    # dim = 3
-    # nPtsValues = np.array([100, 300, 500, 1000, 1500])
-    # dataType = 'sphere'
+    # data_type = 'cyclooctaneMaxmin'
+    # axes_ratios_all = np.array([[3,3,1]])
+    # expansion_dim = 3
+    # nbhd_sizes = [26, 30, 40]
+    # folder = 'datasets/cyclooctane/maxmin_test'
+    # paths = get_paths_of_files_in_a_folder(folder, extension='.mat')
 
-    # for nPts in nPtsValues:
-    #     main(nPts=nPts, dataType=dataType, collapseEdges=True, axesRatios=axesRatios, dim=3)
+    # for path in paths:
+    #     for axes_ratios in axes_ratios_all:
+    #         for nbhd_size in nbhd_sizes:
 
-    # cyclooctane
-    # nPtsValues = np.array([100, 300, 500, 1000, 1500, 2000])
-    dataType = 'cyclooctane'
-    for nPts in nPtsValues:
-        main(nPts=nPts, dataType=dataType, collapseEdges=True, axesRatios=axesRatios, expansionDim=expansionDim)
+    #             # Import points
+    #             points, data_type_params = data_handling.importPoints(path=path)
+
+    #             # Generate the filename for storing the variables 
+    #             n_pts = len(points)
+    #             filename_parameters = set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
+    #             save_filename = generate_filename(filename_parameters)
+
+    #             calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, expansion_dim, save_filename)
 
 
+
+    # picklepath = 'datasets/turkevs2022on-main/DATASETS/holes/point_clouds_300.pkl'
+    picklepath = 'datasets/turkevs2022on-main/DATASETS/holes/point_clouds_test_trnsfs.pkl' 
+
+    objects = []
+    with (open(picklepath, "rb")) as openfile:
+        while True:
+            try:
+                objects.append(pickle.load(openfile))
+            except EOFError:
+                break
+    
+    transformations = ["std", "trns", "rot", "stretch", "shear", "gauss", "out"]
+
+    
+    points_all = objects[0]
+
+    # print(len(points_all['std']))
+    transformation = transformations[0]
+    print(len(points_all[transformation]))
+    print(len(points_all[transformation][0]))
 
 
     
 
+    # N = len(objects[0])
 
+    # start = int(sys.argv[1])
+    # N = int(sys.argv[2])
+
+    # print(type(objects[0]))
+
+    data_pc_transformed = objects[0]
+
+    
+    exit()
+
+    start = 0
+    N = len(points_all[transformation[0]])
+
+    print(start)
+    print(N)
+
+    for transformation in transformations:
+        for i in np.arange(N):
+
+            print('Dataset ' + str(i) + ' of ' + str(N))
+            points = objects[0][i]
+
+            data_type = 'Turkevs-' + transformation + '-' + str(i).zfill(3)
+
+            axes_ratios = np.array([3,1])
+            expansion_dim = 2
+            seed = 0
+            nbhd_size = 9
+            ambient_dim = len(points[0])
+
+            if ambient_dim == 2:
+                axes_ratios = np.array([3,1])
+            elif ambient_dim == 3:
+                axes_ratios = np.array([3,3,1])
+
+            # Generate the filename for storing the variables 
+            n_pts = len(points)
+            data_type_params = {}
+            filename_parameters = set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
+            save_filename = generate_filename(filename_parameters)
+
+            calculate_and_save_ellipsoids_and_rips_data(
+                points, 
+                nbhd_size, 
+                axes_ratios,
+                expansion_dim,
+                save_filename
+            )  
+        
+import pickle 
+import sys
+
+def calculatePDforTurkevs():
+    picklepath = 'datasets/turkevs2022on-main/DATASETS/holes/point_clouds_300.pkl'
+
+    objects = []
+    with (open(picklepath, "rb")) as openfile:
+        while True:
+            try:
+                objects.append(pickle.load(openfile))
+            except EOFError:
+                break
+
+    # N = len(objects[0])
+
+    start = int(sys.argv[1])
+    N = int(sys.argv[2])
+
+    print(start)
+    print(N)
+
+    for i in np.arange(start, start+N):
+
+        print('Dataset ' + str(i) + ' of ' + str(N))
+        points = objects[0][i]
+
+        dataType = 'Turkevs-' + str(i).zfill(3)
+
+        axesRatios = np.array([3,1])
+        expansionDim = 2
+        seed = 0
+        nbhdSize = 9
+        dim = len(points[0])
+
+        if dim == 2:
+            axesRatios = np.array([3,1])
+        elif dim == 3:
+            axesRatios = np.array([3,3,1])
+
+        main(
+            nPts=len(points), 
+            dataType=dataType, 
+            collapseEdges=True, 
+            axesRatios=axesRatios, 
+            expansionDim=expansionDim, 
+            dim=dim,
+            seed=int(seed),
+            nbhdSize=nbhdSize,
+            drawPoints=False,
+            drawEllipsoidsSimplexTree=False,
+            drawEllipsoids = False, 
+            rPlot=0.3,
+            points=points,
+            saveSimplexTree = False,
+            savePoints = False
+        )  
+
+
+if __name__ == "__main__":
+
+    main()

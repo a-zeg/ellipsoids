@@ -1,13 +1,13 @@
-from ellipsoidSimplexTree import Ellipsoid
+import topological_computations
 import numpy as np
 import matplotlib.pyplot as plt
 import barcodePlotting
 import gudhi as gd
-from readWriteData import loadVarsFromFile
-from utils import reduceBarcode
+from data_handling import loadVarsFromFile
+from topological_computations import reduceBarcode
 from datetime import datetime
 
-def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
+def plotEllipse(ellipse: topological_computations.Ellipsoid, color='grey', r=1, axes=None):
     sampleRate = 100
     t = np.linspace(0, 2*np.pi, sampleRate)
     xTemp = r*ellipse.axesLengths[0]*np.cos(t)
@@ -19,7 +19,7 @@ def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     else:
         axes.plot(x,y,c=color)
 
-def plotEllipsoid(ellipsoid: Ellipsoid, color='grey', r=1, axes=None):
+def plotEllipsoid(ellipsoid: topological_computations.Ellipsoid, color='grey', r=1, axes=None):
     # see https://stackoverflow.com/questions/7819498/plotting-ellipsoid-with-matplotlib
     sampleRate = 100
 
@@ -101,58 +101,96 @@ def plotDataPoints(points, axes=None):
     else:
         axes.scatter(points[:,0],points[:,1])
 
+def totuple(a):
+    try:
+        return tuple(totuple(i) for i in a)
+    except TypeError:
+        return a
+
 def visualisation(**kwargs):
     print('Generating plots...')
 
     xAxisEnd = kwargs['xAxisEnd']
     barcodeEllipsoids = kwargs['barcodeEllipsoids']
     barcodeRips = kwargs['barcodeRips']
-
-    listOfPlotPointsVars = \
-    ['points', 'xAxisEnd',
-                        'expansionDim',
-                        'ellipsoidList',
-                        'simplexTreeEllipsoids',
-                        'simplexTreeRips',
-                        'barcodeEllipsoids',
-                        'barcodeRips',
-                        'plotPoints',
-                        'plotBarcodes',
-                        'showPlot',
-                        'savePlot',
-                        'filename']
+    plotDensity = False
+    if 'plotDensity' in kwargs:
+        plotDensity = kwargs['plotDensity']
     
-    if set(listOfPlotPointsVars).issubset(kwargs): 
-        points = kwargs['points']
-        dim = len(points[0])
-        expansionDim = kwargs['expansionDim']
-        simplexTreeEllipsoids = kwargs['simplexTreeEllipsoids']
-        simplexTreeEllipsoids.expansion(expansionDim)
 
-        fig = plt.figure(figsize=(14,7))
+    figsize = (10,10)
+
+    drawPoints = False
+    drawEllipsoids = False
+    drawEllipsoidsSimplexTree = False
+
+    if 'drawPoints' in kwargs:
+        drawPoints = kwargs['drawPoints']
+    if 'drawEllipsoids' in kwargs:
+        drawEllipsoids = kwargs['drawEllipsoids']
+    if 'drawEllipsoidsSimplexTree' in kwargs:
+        drawEllipsoidsSimplexTree = kwargs['drawEllipsoidsSimplexTree']
+    if 'rPlot' in kwargs:
+        rPlot = kwargs['rPlot']
+    else: rPlot = 0.5
+    if 'persistenceDim' in kwargs:
+        persistenceDim = kwargs['persistenceDim']
+    else:
+        persistenceDim = 0
+
+
+    # if set(listOfPlotPointsVars).issubset(kwargs): 
+    if drawPoints or drawEllipsoids: 
+        figsize = (14,7)
+        if 'points' in kwargs:
+            points = kwargs['points']
+        else: 
+            print("Cannot plot points; no list of points provided.")
+            exit()
+
+        dim = len(points[0])
+        fig = plt.figure(figsize=figsize)
         gs = fig.add_gridspec(2,2)
+
         if dim == 2:
             axData = fig.add_subplot(gs[:, 0])
         else:
             axData = fig.add_subplot(gs[:,0], projection='3d')
+
         axBarE = fig.add_subplot(gs[0, 1])
         axBarR = fig.add_subplot(gs[1, 1])
+
         for point in points:
             axData.scatter(*point, c='k')
         axData.set_title('Data (%d points)' %len(points), fontsize=12)
-        if ('ellipsoidList' in kwargs or 'ellipseList' in kwargs) and ('rPlot' in kwargs) and (kwargs['rPlot'] != 0):
-            ellipsoidList = kwargs['ellipsoidList'] if 'ellipsoidList' in kwargs else kwargs['ellipseList']
-            rPlot = kwargs['rPlot']
+
+        if drawEllipsoids:
+            if 'expansionDim' in kwargs:
+                expansionDim = kwargs['expansionDim']
+            else: expansionDim = 1
+            if ('ellipsoidList' in kwargs) or ('ellipseList' in kwargs):
+                ellipsoidList = kwargs['ellipsoidList'] if 'ellipsoidList' in kwargs else kwargs['ellipseList']
+            else:
+                print('Cannot plot ellipsoids, no list of ellipsoids provided.')
+        
             if dim == 2:
                 plotEllipses(ellipsoidList, rPlot, axes=axData)
             if dim == 3:
                 plotEllipsoids(ellipsoidList, rPlot, axes=axData)
-            plotSimplexTree(points, simplexTreeEllipsoids, rPlot, axes=axData)
-            axData.set_title('Data and the ellipsoid simplex tree for r = %0.2f' %(rPlot), fontsize=12)
+
+            if drawEllipsoidsSimplexTree:
+                if 'simplexTreeEllipsoids' in kwargs:
+                    simplexTreeEllipsoids = kwargs['simplexTreeEllipsoids']
+                    plotSimplexTree(points, simplexTreeEllipsoids, rPlot, axes=axData)
+                    axData.set_title(f'Point cloud data for {len(points)} points')# and the ellipsoid simplex tree for r = %0.2f' %(rPlot), fontsize=12)
+                else:
+                    print('Cannot plot ellipsoid simplex tree; no ellipsoid simplex tree provided.')
+                    axData.set_title(f'Point cloud data for {len(points)} points')
+                    
         axData.set_aspect('equal', adjustable='box')
 
     else:
-        fig = plt.figure(figsize=(14,7))
+        fig = plt.figure(figsize=figsize)
         gs = fig.add_gridspec(2,1)
         axBarE = fig.add_subplot(gs[0, 0])
         axBarR = fig.add_subplot(gs[1, 0])
@@ -162,15 +200,72 @@ def visualisation(**kwargs):
         filename = kwargs['filename']
     else: filename = 'data/plotTest.png'
 
-    print('Plotting ellipsoid barcode... ', end='', flush=True)
-    barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
-                                             axis_start = -0.1, infinity = xAxisEnd, max_intervals=100)
+    if plotDensity:
+        highestColor = None
+
+        birth_min = 0
+        birth_max = 0
+        death_min = 0
+        death_max = 0
+        cmap = 'Blues'
+        nBarsDim0 = 0
+        nBarsDim1 = 0
+        nBarsDim2 = 0
+        maxNBars = 10000
+        if persistenceDim == 0:
+            nBarsDim0 = maxNBars
+        elif persistenceDim == 1:
+            nBarsDim1 = maxNBars
+        elif persistenceDim == 2:
+            nBarsDim2 = maxNBars
+        else:
+            nBarsDim0 = maxNBars
+            nBarsDim1 = maxNBars
+            nBarsDim2 = maxNBars
+        
+        maxBarEndEllipsoids = 1
+        maxBarEndRips = 1 
+        barcodeEllipsoidsReduced, maxBarEndEllipsoids = reduceBarcode(barcodeEllipsoids, nBarsDim0=nBarsDim0, nBarsDim1=nBarsDim1, nBarsDim2=nBarsDim2)
+        barcodeRipsReduced, maxBarEndRips = reduceBarcode(barcodeRips, nBarsDim0=nBarsDim0, nBarsDim1=nBarsDim1, nBarsDim2=nBarsDim2)
+        #print(barcodeRipsReduced)
+        for bar in barcodeRipsReduced:
+            print(bar[1][1]-bar[1][0])
+            # if bar[1][0] > bar[1][1]:
+            #     print(bar)
+        #exit()
+        death_max = max(maxBarEndEllipsoids, maxBarEndRips)
+        birth_max = death_max
+
+    if plotDensity:
+        print('Plotting ellipsoid density... ', end='', flush=True)
+        #barcodeEllipsoids = totuple(barcodeEllipsoids)
+        print(barcodeEllipsoids[0])
+        #exit()
+        barcodePlotting.plot_persistence_density(persistence=barcodeEllipsoidsReduced, axes=axBarE, fontsize=12,\
+                                                    max_intervals=1000, #dimension=persistenceDim,
+                                                    birth_min=birth_min, birth_max=birth_max,
+                                                    death_min=death_min, death_max=death_max,
+                                                    cmap=cmap,
+                                                    highestColor=highestColor)
+    else:
+        print('Plotting ellipsoid barcode... ', end='', flush=True)
+        barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
+                                            axis_start = -0.1, infinity = xAxisEnd, max_intervals=100)
     print('Done.')
     axBarE.set_title('Ellipsoid barcode', fontsize=12)
 
-    print('Plotting Rips barcode... ', end='', flush=True)
-    barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
-                                             axis_start = -0.1, infinity = xAxisEnd, max_intervals=100) #(0.1 + xAxisEnd))
+    if plotDensity:
+        print('Plotting Rips density... ', end='', flush=True)
+        barcodePlotting.plot_persistence_density(persistence=barcodeRipsReduced, axes=axBarR, fontsize=12,\
+                                                    max_intervals=1000, #dimension=persistenceDim,
+                                                    birth_min=birth_min, birth_max=birth_max,
+                                                    death_min=death_min, death_max=death_max,
+                                                    cmap=cmap,
+                                                    highestColor=highestColor)
+    else:
+        print('Plotting Rips barcode... ', end='', flush=True)
+        barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axBarR, fontsize=12,\
+                                            axis_start = -0.1, infinity = xAxisEnd, max_intervals=100) #(0.1 + xAxisEnd))
     print('Done.')
     axBarR.set_title('Rips barcode', fontsize=12)
     
@@ -185,13 +280,32 @@ def visualisationFromFile(\
         filename, \
         nBarsDim0=1, nBarsDim1=0, nBarsDim2=0, \
         rPlot=0.6, \
-        plotEllipsoids=False, \
-        savePlot=False):
+        drawEllipsoids=False, \
+        drawEllipsoidsSimplexTree=False, \
+        savePlot=False,
+        showPlot=False,
+        plotDensity=False,
+        persistenceDim=0):
 
     print('Reading in the variables... ', end='', flush=True)
     vars = loadVarsFromFile(filename)
-    barcodeEllipsoids = vars['barcodeEllipsoids']
-    barcodeRips = vars['barcodeRips']
+
+    if 'barcodeEllipsoids' in vars:
+        barcodeEllipsoids = vars['barcodeEllipsoids']
+    elif 'barcode_ellipsoids' in vars:
+        barcodeEllipsoids = vars['barcode_ellipsoids']
+    else:
+        print('Error: ellipsoids barcode not found.')
+        exit()
+
+    if 'barcodeRips' in vars:
+        barcodeRips = vars['barcodeRips']
+    elif 'barcode_rips' in vars:
+        barcodeRips = vars['barcode_rips']
+    else:
+        print('Error: Rips barcode not found.')
+        exit()
+
     print('Done.')
 
     print('Calculating the reduced barcodes... ', end='', flush=True)
@@ -213,9 +327,10 @@ def visualisationFromFile(\
 
     print('Plotting...')
 
-    filename = filename[:filename.rfind('.')] + '-barcodesDim=0:' + f'{nBarsDim0}' + '_1:' + f'{nBarsDim1}' + '_2:' + f'{nBarsDim2}' + datetime.now().strftime("_%Y%m%d_%H%M%S") + '.json'
-
-    if plotEllipsoids is True:
+    filename = filename[:filename.rfind('.')] + '-barcodesDim=0-' + f'{nBarsDim0}' + '_1-' + f'{nBarsDim1}' + '_2-' + f'{nBarsDim2}' + datetime.now().strftime("_%Y%m%d_%H%M%S")
+    filename = filename + '.png'
+    
+    if drawEllipsoids is True:
         simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
         simplexTreeRips = vars['simplexTreeRips']
         points = vars['points']
@@ -226,14 +341,22 @@ def visualisationFromFile(\
                     barcodeEllipsoids = barcodeEllipsoids, \
                     barcodeRips = barcodeRips, \
                     xAxisEnd = xAxisEnd, \
-                    showPlot = True, \
-                    savePlot = savePlot
+                    showPlot = showPlot, \
+                    savePlot = savePlot, \
+                    filename = filename, \
+                    drawEllipsoids = drawEllipsoids, 
+                    drawEllipsoidsSimplexTree = drawEllipsoidsSimplexTree,
+                    plotDensity = plotDensity,
+                    persistenceDim = persistenceDim
                     )
     else:
         visualisation( \
                     xAxisEnd = xAxisEnd, \
                     barcodeEllipsoids = barcodeEllipsoids, \
                     barcodeRips = barcodeRips, \
-                    showPlot = True, \
+                    showPlot = showPlot, \
                     savePlot = savePlot, \
+                    filename = filename,
+                    plotDensity = plotDensity,
+                    persistenceDim = persistenceDim
                     )
