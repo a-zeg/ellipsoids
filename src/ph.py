@@ -188,13 +188,14 @@ def sorted_lifespans_pd(PD, size):
     return lifespans[0:size]
 
 
-
-def sorted_lifespans_pds(pds, size = None):
+def sorted_lifespans_pds(pds, size=100):
     if size is None:
         pds_len = [len(pd) for pd in pds]
-        size = max(pds_len)        
+        size = max(pds_len)
+
     lifespans_pds = [sorted_lifespans_pd(pd, size) for pd in pds]
-    lifespans_pds = np.asarray(lifespans_pds)    
+    lifespans_pds = np.asarray(lifespans_pds)
+
     return lifespans_pds
 
 
