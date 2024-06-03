@@ -117,7 +117,8 @@ def plot_persistence_barcode(
     axes=None,
     fontsize=16,
     axis_start=None,
-    infinity=None
+    infinity=None,
+    bar_height=None,
 ):
     """This function plots the persistence bar code from persistence values list
     , a np.array of shape (N x 2) (representing a diagram
@@ -206,6 +207,9 @@ def plot_persistence_barcode(
         y = [(death - birth) if death != float("inf") else (infinity - birth) for (dim, (birth, death)) in persistence]
         c = [colormap[dim] for (dim, (birth, death)) in persistence]
 
+        if bar_height is None:
+            bar_height = 0.7
+     
         axes.barh(range(len(x)), y, left=x, alpha=alpha, color=c, linewidth=0)
 
         if legend is None and not nx2_array:
@@ -222,6 +226,19 @@ def plot_persistence_barcode(
         axes.set_title("Persistence barcode", fontsize=fontsize)
         axes.set_yticks([])
         axes.invert_yaxis()
+
+        margin = 0.1
+        n_bars = len(persistence)
+        # axes.set_ylim([-2*bar_height, n_bars*bar_height])
+
+        fig = axes.get_figure()
+        fig_height = n_bars * (bar_height + margin)
+        padding=1.0
+        fig_height = n_bars * (bar_height + margin) + padding * 2  # Add padding to top and bottom
+        
+        fig.set_figheight(fig_height)
+        # fig.subplots_adjust(top=12, bottom=0)
+
 
         # Ends plot on infinity value and starts a little bit before min_birth
         if len(x) != 0:

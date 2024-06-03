@@ -485,7 +485,7 @@ def loadVarsFromFile(filename):
         vars['simplexTreeRips'] = simplexTreeRips
 
     if 'barcodeEllipsoids' in jsonVars:
-        vars['barcodeEllipsoids'] = jsonVars['barcodeEllipsoids']
+        vars['barcode_ellipsoids'] = jsonVars['barcodeEllipsoids']
     elif 'barcode_ellipsoids' in jsonVars:
         vars['barcode_ellipsoids'] = jsonVars['barcode_ellipsoids']
 
@@ -674,19 +674,24 @@ def initialize_pds0_and_pds1(folder):
 
 def read_pd0_and_pd1(path):
 
-    vars = loadVarsFromFile(path)
+    with open(path, "r") as f:
+            vars = json.load(f)
+
     
     pd0 = []
     pd1 = []
+    label = None
 
     if 'barcodeEllipsoids' in vars:
         barcode_ellipsoids = vars['barcodeEllipsoids']
     elif 'barcode_ellipsoids' in vars:
         barcode_ellipsoids = vars['barcode_ellipsoids']
     else:
-        NameError('JSON file does not contain the ellipsoids barcode.')
+        exit('The file ' + path + ' does not contain the ellipsoids barcode.')
     if 'points' in vars:
         points = vars['points']
+    if 'label' in vars:
+        label = int(vars['label'])
 
     for bar in barcode_ellipsoids:
         if bar[0] == 0:
@@ -694,7 +699,15 @@ def read_pd0_and_pd1(path):
         elif bar[0] == 1:
             pd1.append(bar[1])
 
-    return pd0, pd1, points
+    return pd0, pd1, points, label
+
+def remove_dim_from_barcode(barcode):
+
+    result_barcode = []
+    for bar in barcode:
+            result_barcode.append(bar[1])
+    return result_barcode
+
 
 
 def import_turkevs_transformed(folder):
@@ -732,6 +745,7 @@ def import_turkevs_transformed(folder):
     pds0 = {}
     pds1 = {}
     points = {}
+    labels = [None] * files_per_transformation
 
     for transformation in transformations:
         pds0[transformation] = [None]*files_per_transformation
@@ -742,10 +756,11 @@ def import_turkevs_transformed(folder):
     for path in paths:
         transformation, index = parse_turkevs_filename(path)
 
-        pd0, pd1, points_ = read_pd0_and_pd1(path)
+        pd0, pd1, points_, label = read_pd0_and_pd1(path)
         pds0[transformation][index] = pd0
         pds1[transformation][index] = pd1
         points[transformation][index] = points_
+        labels[index] = label
 
 
     # -------- Pad to max length ----------
@@ -767,7 +782,11 @@ def import_turkevs_transformed(folder):
         pds1[transformation] = extend_pds_to_length(pds1[transformation], max(max_pd1_length))
     # ------------------------------------
 
-    return pds0, pds1, points
+    labels = np.asarray(labels)
+
+    print(labels)
+
+    return pds0, pds1, points, labels
 
 
 
@@ -787,3 +806,86 @@ def find_subfolder_with_given_id(parentfolder, id):
         exit()
     
     return jsondatafolder
+
+
+def generate_filename(filename_parameters: dict, folder='data', timestamp = ''):
+    '''
+    Generates filename by creating a string from the variables in 
+    filename_parameters and appends the timestamp if the value of 
+    `timestamp` is True.
+    '''
+    filename = 'ellipsoids'
+    for key, value in filename_parameters.items():
+        filename = filename + '_' + key + '=' + str(value)
+
+    if timestamp != '':
+        filename = filename + '_' + timestamp
+
+    return os.path.join(folder, filename)
+
+def set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params: dict):
+
+    filename_params = {
+        'data_type': data_type,
+        'n_pts': n_pts,
+        'nbhd_size': nbhd_size,
+        'axes_ratios': axes_ratios,
+    }
+
+    filename_params.update(data_type_params)
+
+    return filename_params
+
+
+def filter_dictionary(vars_to_save: list[str], dict_all_vars):
+
+    results = {}
+    for var_name in vars_to_save:
+        if var_name in dict_all_vars:
+            results[var_name] = dict_all_vars[var_name]
+        else: 
+            print('Warning: ' + var_name + ' does not exist in the local variables and will not be saved.')
+    
+    return results
+
+
+
+def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, expansion_dim, filename, additional_vars_dict={}):
+    
+    # Specify the names of variables to be saved
+    vars_to_save = [
+        'ambient_dim',
+        'expansion_dim',
+        'nbhd_size',
+        'n_pts',
+        't_total',
+        't_ellipsoids_over_t_rips',
+        'points',
+        'barcode_ellipsoids',
+        'barcode_rips'
+    ]
+
+    if 'ambient_dim' in vars_to_save:
+        ambient_dim = len(points[0])
+    if 'n_pts' in vars_to_save:
+        n_pts = len(points)
+
+    # Calculate barcodes for ellipsoids and Rips complexes
+    barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, t_ellipsoids \
+        = topological_computations.calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
+    barcode_rips, simplex_tree_rips, t_rips \
+        = topological_computations.calculate_rips_barcode(points, expansion_dim=expansion_dim)
+
+    # Get the execution time
+    t_ellipsoids_over_t_rips = t_ellipsoids / t_rips
+    t_total = t_ellipsoids + t_rips
+    print('\nThe total execution time is ' + str(t_total) + '\n')
+
+    # Save variables to file
+    params_dict = filter_dictionary(vars_to_save, locals())
+
+    if additional_vars_dict: # if not empty
+        for key, value in additional_vars_dict.items():
+            params_dict[key] = value
+    
+    saveVarsToFile(params_dict, filename=filename)

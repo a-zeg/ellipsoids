@@ -138,8 +138,8 @@ def run_experiments(json_data_folder, results_path):
     print("TRAIN_SIZES = ", TRAIN_SIZES)
 
 
-    _, pde1, points_dict_of_lists = data_handling.import_turkevs_transformed(json_data_folder)
-    data_pc_trnsfs, labels = get_points_and_labels_from_dict(points_dict_of_lists)
+    _, pde1, points_dict_of_lists, labels = data_handling.import_turkevs_transformed(json_data_folder)
+    data_pc_trnsfs, labels_check = get_points_and_labels_from_dict(points_dict_of_lists)
     data_pc = data_pc_trnsfs['std']
     num_point_clouds = len(data_pc)
 
@@ -236,7 +236,7 @@ def run_experiments(json_data_folder, results_path):
 
 if __name__ == '__main__':
 
-    parentfolder = 'data_debugging_202405'
+    parentfolder = 'data/turkevs_20240529/data'
     n_runs = 20
 
     ids = ['id=0002'] # (0001 is the first downsampled, also calculated with the prev version of the code)

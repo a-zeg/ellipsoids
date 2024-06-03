@@ -14,82 +14,85 @@ import os
 # import data_construction
 
 
+# def generate_filename(filename_parameters: dict, folder='data', timestamp = ''):
+#     '''
+#     Generates filename by creating a string from the variables in 
+#     filename_parameters and appends the timestamp if the value of 
+#     `timestamp` is True.
+#     '''
+#     filename = 'ellipsoids'
+#     for key, value in filename_parameters.items():
+#         filename = filename + '_' + key + '=' + str(value)
+
+#     if timestamp != '':
+#         filename = filename + '_' + timestamp
+
+#     return os.path.join(folder, filename)
+
+# def set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params: dict):
+
+#     filename_params = {
+#         'data_type': data_type,
+#         'n_pts': n_pts,
+#         'nbhd_size': nbhd_size,
+#         'axes_ratios': axes_ratios,
+#     }
+
+#     filename_params.update(data_type_params)
+
+#     return filename_params
 
 
-def generate_filename(filename_parameters: dict, folder='data', timestamp = ''):
-    '''
-    Generates filename by creating a string from the variables in 
-    filename_parameters and appends the timestamp if the value of 
-    `timestamp` is True.
-    '''
-    filename = 'ellipsoids'
-    for key, value in filename_parameters.items():
-        filename = filename + '_' + key + '=' + str(value)
+# def filter_dictionary(vars_to_save: list[str], dict_all_vars):
 
-    if timestamp != '':
-        filename = filename + '_' + timestamp
-
-    return os.path.join(folder, filename)
-
-def set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params: dict):
-
-    filename_params = {
-        'data_type': data_type,
-        'n_pts': n_pts,
-        'nbhd_size': nbhd_size,
-        'axes_ratios': axes_ratios,
-    }
-
-    filename_params.update(data_type_params)
-
-    return filename_params
-
-
-def filter_dictionary(vars_to_save: list[str], dict_all_vars):
-
-    results = {}
-    for var_name in vars_to_save:
-        if var_name in dict_all_vars:
-            results[var_name] = dict_all_vars[var_name]
-        else: 
-            print('Warning: ' + var_name + ' does not exist in the local variables and will not be saved.')
+#     results = {}
+#     for var_name in vars_to_save:
+#         if var_name in dict_all_vars:
+#             results[var_name] = dict_all_vars[var_name]
+#         else: 
+#             print('Warning: ' + var_name + ' does not exist in the local variables and will not be saved.')
     
-    return results
+#     return results
 
 
 
-def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, expansion_dim, filename):
+# def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, expansion_dim, filename, vars_dict={}):
     
-    # Specify the names of variables to be saved
-    vars_to_save = [
-        'ambient_dim',
-        'expansion_dim',
-        'nbhd_size',
-        'n_pts',
-        't_total',
-        't_ellipsoids_over_t_rips',
-        'points',
-        'barcode_ellipsoids',
-        'barcode_rips'
-    ]
+#     # Specify the names of variables to be saved
+#     vars_to_save = [
+#         'ambient_dim',
+#         'expansion_dim',
+#         'nbhd_size',
+#         'n_pts',
+#         't_total',
+#         't_ellipsoids_over_t_rips',
+#         'points',
+#         'barcode_ellipsoids',
+#         'barcode_rips'
+#     ]
 
-    if 'ambient_dim' in vars_to_save:
-        ambient_dim = len(points[0])
-    if 'n_pts' in vars_to_save:
-        n_pts = len(points)
+#     if 'ambient_dim' in vars_to_save:
+#         ambient_dim = len(points[0])
+#     if 'n_pts' in vars_to_save:
+#         n_pts = len(points)
 
-    # Calculate barcodes for ellipsoids and Rips complexes
-    barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, t_ellipsoids = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
-    barcode_rips, simplex_tree_rips, t_rips = calculate_rips_barcode(points, expansion_dim=expansion_dim)
+#     # Calculate barcodes for ellipsoids and Rips complexes
+#     barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, t_ellipsoids = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
+#     barcode_rips, simplex_tree_rips, t_rips = calculate_rips_barcode(points, expansion_dim=expansion_dim)
 
-    # Get the execution time
-    t_ellipsoids_over_t_rips = t_ellipsoids / t_rips
-    t_total = t_ellipsoids + t_rips
-    print('\nThe total execution time is ' + str(t_total) + '\n')
+#     # Get the execution time
+#     t_ellipsoids_over_t_rips = t_ellipsoids / t_rips
+#     t_total = t_ellipsoids + t_rips
+#     print('\nThe total execution time is ' + str(t_total) + '\n')
 
-    # Save variables to file
-    params_dict = filter_dictionary(vars_to_save, locals())
-    data_handling.saveVarsToFile(params_dict, filename=filename)
+#     # Save variables to file
+#     params_dict = filter_dictionary(vars_to_save, locals())
+
+#     if vars_dict: # if not empty
+#         for key, value in vars_dict.items():
+#             params_dict[key] = value
+    
+#     data_handling.saveVarsToFile(params_dict, filename=filename)
         
 
 # def get_paths_of_files_in_a_folder(folder, extension='.mat'):

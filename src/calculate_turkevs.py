@@ -1,13 +1,12 @@
 # from  import get_paths_of_files_in_a_folder
-from main import set_filename_parameters
-from main import generate_filename
-from main import calculate_and_save_ellipsoids_and_rips_data
+import data_handling
 import numpy as np
-import pickle
-import re
 import os
+import json
+import sys
+import re
 
-def calculate_turkevs(picklepath: str):
+def calculate_turkevs(path: str):
     '''
     Read in the turkevs point cloud data (the output of generate_turkevs.py), calculate the ellipsoids barcodes
     and save to files.
@@ -20,27 +19,37 @@ def calculate_turkevs(picklepath: str):
 
     longest_axis = 3    # will be expanded to [3:1] or [3:3:1] depending on ambient dimension below
     expansion_dim = 2
-    nbhd_size = 9
+    nbhd_size = 5
 
-    objects = []
-    with (open(picklepath, "rb")) as openfile:
-        while True:
-            try:
-                objects.append(pickle.load(openfile))
-            except EOFError:
-                break
+    with open(path, 'r') as f:
+        data_pc_trnsfs = json.load(f)
 
-    id = re.search(r'id=(\d+)', picklepath).group(1)
+    id = re.search(r'id=(\d+)', path).group(1)
+
+    subfolder = os.path.join('data', 'id=' + str(id))
+    if not os.path.isdir(subfolder):
+        os.makedirs(subfolder)
+        print('Created folder ' + subfolder)
+
+    # objects = []
+    # with (open(picklepath, "rb")) as openfile:
+    #     while True:
+    #         try:
+    #             objects.append(pickle.load(openfile))
+    #         except EOFError:
+    #             break
+    # data_transformed = objects[0]
+
+    labels = data_pc_trnsfs['labels']
 
     transformations = ["std", "trns", "rot", "stretch", "shear", "gauss", "out"]
-    data_transformed = objects[0]
 
     for transformation in transformations:
-        N = len(data_transformed[transformation])
+        N = len(data_pc_trnsfs[transformation])
         for i in np.arange(N):
 
             print(transformation + ': dataset ' + str(i) + ' of ' + str(N))
-            points = data_transformed[transformation][i]
+            points = np.asarray(data_pc_trnsfs[transformation][i])
 
             print(len(points))
             data_type = 'Turkevs-' + transformation + '-' + str(i).zfill(3)
@@ -54,21 +63,34 @@ def calculate_turkevs(picklepath: str):
             # Generate the filename for storing the variables 
             n_pts = len(points)
             data_type_params = {'id': id}
-            filename_parameters = set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
-            save_filename = generate_filename(filename_parameters) 
+            filename_parameters = data_handling.set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
+            save_filename = data_handling.generate_filename(filename_parameters, folder=subfolder) 
 
-            calculate_and_save_ellipsoids_and_rips_data(
+            vars_dict = {}
+            vars_dict['label'] = labels[i]
+            vars_dict['id'] = id
+            vars_dict['transformation'] = transformation
+            vars_dict['index'] = i
+
+            data_handling.calculate_and_save_ellipsoids_and_rips_data(
                 points,
                 nbhd_size,
                 axes_ratios,
                 expansion_dim,
-                save_filename
+                save_filename,
+                vars_dict
             )  
+
 
 
 if __name__ == '__main__':
 
     folder = 'datasets/turkevs'
-    filename = 'pc_test_trnsfs_N=100_n=100_id=0006.pkl'
-    path = os.path.join(folder,filename)
+    # filename = 'pc_test_trnsfs_N=100_n=20_id=0008.json'
+    # path = os.path.join(folder,filename)
+
+    path = str(sys.argv[1])
+    # path = 'datasets/turkevs/pc_test_trnsfs_N=20_n=20_id=0012.json'
+
     calculate_turkevs(path)
+
