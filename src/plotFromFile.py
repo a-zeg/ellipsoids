@@ -10,9 +10,9 @@ filename = \
 folder = "data/shapes"
 
 rPlot = 0.2
-nBarsDim0 = 10
-nBarsDim1 = 10
-nBarsDim2 = 10
+nBarsDim0 = 1
+nBarsDim1 = 1
+nBarsDim2 = 0
 
 savePlot = True
 drawEllipsoidsSimplexTree = False

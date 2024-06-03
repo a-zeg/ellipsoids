@@ -1,7 +1,4 @@
 # from  import get_paths_of_files_in_a_folder
-from main import set_filename_parameters
-from main import generate_filename
-from main import calculate_and_save_ellipsoids_and_rips_data
 import data_handling
 import numpy as np
 import pickle
@@ -9,7 +6,7 @@ import data_construction
 import re
 import os
 
-def generate_turkevs_datasets(N: int, n: int, filename: str):
+def generate_turkevs_datasets(N: int, n: int, filename: str, seed: int, save_to_file=True):
     '''
     Generate datasets for Turkevs experiments (the original point clouds +
     transformed point clouds) and save them as pkl files.
@@ -24,13 +21,17 @@ def generate_turkevs_datasets(N: int, n: int, filename: str):
             The number of points in each point cloud.
         filename : str
             The name of the file in which to save the pickled point clouds.
+        seed : int
+            The seed for the random number generator.
     '''
 
-    if not filename.endswith('.pkl'):
-        filename = filename + '.pkl'
+    np.random.seed(seed)
+
+    # if not filename.endswith('.pkl'):
+    #     filename = filename + '.pkl'
 
     print("\n\nConstructing the data...")
-    data_pc, _, _ = data_construction.build_dataset_holes(N, n)
+    data_pc, labels, _ = data_construction.build_dataset_holes(N, n)
     data_pc_trns = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "translation")
     data_pc_rot = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "rotation")
     data_pc_stretch = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "stretch")
@@ -46,8 +47,17 @@ def generate_turkevs_datasets(N: int, n: int, filename: str):
     data_pc_trnsfs["gauss"] = data_pc_gauss
     data_pc_trnsfs["out"] = data_pc_out
 
-    with open(filename, "wb") as f:
-        pickle.dump(data_pc_trnsfs, f)
+    data_pc_trnsfs['seed'] = seed
+    data_pc_trnsfs['labels'] = labels
+
+    if save_to_file is True:
+        data_handling.saveVarsToFile(data_pc_trnsfs, filename=filename, timestamp=False)
+
+
+    return data_pc_trnsfs
+
+    # with open(filename, "wb") as f:
+    #     pickle.dump(data_pc_trnsfs, f)
 
 def generate_id(folder):
     '''
@@ -56,7 +66,10 @@ def generate_id(folder):
 
     This function checks the ids of all the pkl files in the given folder and returns the next available one.
     '''
-    paths = data_handling.get_paths_of_files_in_a_folder(folder, extension='pkl')
+    pathspkl = data_handling.get_paths_of_files_in_a_folder(folder, extension='pkl')
+    pathsjson = data_handling.get_paths_of_files_in_a_folder(folder, extension='json')
+    paths = pathspkl + pathsjson
+
     id = 0
     for path in paths:
         match = re.search(r'id=(\d+)', path) 
@@ -71,8 +84,9 @@ def generate_id(folder):
 if __name__ == '__main__':
 
     folder = 'datasets/turkevs'
-    N = 100
-    n = 100
+    N = 20
+    n = 20
     id = generate_id(folder)
-    filename = 'datasets/turkevs/pc_test_trnsfs' + '_' + f'{N=}' + '_' + f'{n=}' + '_' + 'id=' + id + '.pkl'
-    generate_turkevs_datasets(N, n, filename)
+    filename = 'datasets/turkevs/pc_test_trnsfs' + '_' + f'{N=}' + '_' + f'{n=}' + '_' + 'id=' + id
+    seed = int(id)
+    _ = generate_turkevs_datasets(N, n, filename, seed=seed)
