@@ -9,7 +9,8 @@ import data_handling
 
 ###### User input ######
 filename = \
-    "data/shapes/ellipsoids_data_type=annulus_n_pts=10_nbhd_size=5_axes_ratios=[3 1]_seed=0__20240430_154603.json"
+    "data/shapes/ellipsoids_data_type=figure_eight_n_pts=150_nbhd_size=5_axes_ratios=[3 1]_seed=0__20240430_162531.json"
+    # "data/shapes/ellipsoids_data_type=annulus_n_pts=10_nbhd_size=5_axes_ratios=[3 1]_seed=0__20240430_154603.json"
 
 folder = "data/shapes"
 
@@ -50,7 +51,7 @@ fig, axes = plt.subplots()
 # axes.set_ylim([-1,10])
 
 barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axes, fontsize=12,\
-                                        axis_start = -0.1, infinity = xAxisEnd, max_intervals=100, bar_height=0.05) 
+                                        axis_start = -0.1, infinity = xAxisEnd, max_intervals=100) 
 
 plt.show()
 
