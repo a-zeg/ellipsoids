@@ -1,7 +1,3 @@
-
-from main import set_filename_parameters
-from main import generate_filename
-from main import calculate_and_save_ellipsoids_and_rips_data
 import data_handling
 import numpy as np
 import os
@@ -15,6 +11,14 @@ import visualisation
 
 
 def draw_figure(r_plot):
+
+    '''
+    Draws:
+     - points sampled from a circle;
+     - fitted ellipses;
+     - ellipsoids simplex
+    for a number of parameters r
+    '''
 
     # Import points
     data_type = 'circle'
