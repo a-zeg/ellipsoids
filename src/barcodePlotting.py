@@ -208,9 +208,9 @@ def plot_persistence_barcode(
         c = [colormap[dim] for (dim, (birth, death)) in persistence]
 
         if bar_height is None:
-            bar_height = 0.7
+            bar_height = 0.6
      
-        axes.barh(range(len(x)), y, left=x, alpha=alpha, color=c, linewidth=0)
+        axes.barh(range(len(x)), y, left=x, alpha=alpha, color=c, linewidth=0, height=bar_height)
 
         if legend is None and not nx2_array:
             # By default, if persistence is an array of (dimension, (birth, death)), display the legend
@@ -227,17 +227,24 @@ def plot_persistence_barcode(
         axes.set_yticks([])
         axes.invert_yaxis()
 
-        margin = 0.1
+        # -------------------------------- 
+        # the next part fixes the scaling 
+        margin = 0.4
         n_bars = len(persistence)
-        # axes.set_ylim([-2*bar_height, n_bars*bar_height])
+        padding = 1.5
+
 
         fig = axes.get_figure()
-        fig_height = n_bars * (bar_height + margin)
-        padding=1.0
-        fig_height = n_bars * (bar_height + margin) + padding * 2  # Add padding to top and bottom
+        axes.set_ylim([-padding, (n_bars-1) + padding])
+        fig_height = n_bars * (bar_height + margin)# + padding
         
         fig.set_figheight(fig_height)
-        # fig.subplots_adjust(top=12, bottom=0)
+
+        width_inches = 10
+        height_inches = n_bars * margin + padding
+        fig.set_size_inches(width_inches, height_inches)
+        fig.subplots_adjust(top=0.85)
+        # --------------------------------          
 
 
         # Ends plot on infinity value and starts a little bit before min_birth
