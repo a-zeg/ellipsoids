@@ -239,7 +239,7 @@ if __name__ == '__main__':
     parentfolder = 'data/turkevs_20240529/data'
     n_runs = 20
 
-    ids = ['id=0002'] # (0001 is the first downsampled, also calculated with the prev version of the code)
+    ids = ['id=0005'] # (0001 is the first downsampled, also calculated with the prev version of the code)
 
     for id in ids: 
 
@@ -247,6 +247,8 @@ if __name__ == '__main__':
         if not os.path.isdir(path_results):
             os.makedirs(path_results)
             print('Created folder ' + path_results)
+        else:
+            path_results = path_results +'_'+ data_handling.get_timestamp()
 
         data_folder = os.path.join(parentfolder, id)
 

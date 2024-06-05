@@ -7,15 +7,15 @@ as well as the other algorithms used in "On the effectiveness of persistent homo
 
 import os
 import data_handling
-from turkevs_holes_experiment import find_subfolder_with_given_id
+# from data_handling import find_subfolder_with_given_id
 import plots
 import matplotlib.pyplot as plt
 
 
 if __name__ == '__main__':
 
-    parentfolder = 'data/turkevs_20240520'
-    id = 'id=0004_filtered' # 0001 is the first downsampled, also calculated with the prev version of the code
+    parentfolder = 'data/turkevs_20240529/data'
+    id = 'id=0005' # 0001 is the first downsampled, also calculated with the prev version of the code
 
     path_results = os.path.join(parentfolder, id+'_results')
     if not os.path.isdir(path_results):
