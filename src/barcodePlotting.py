@@ -225,7 +225,6 @@ def plot_persistence_barcode(
 
         axes.set_title("Persistence barcode", fontsize=fontsize)
         axes.set_yticks([])
-        axes.invert_yaxis()
 
         # -------------------------------- 
         # the next part fixes the scaling 
@@ -237,13 +236,15 @@ def plot_persistence_barcode(
         fig = axes.get_figure()
         axes.set_ylim([-padding, (n_bars-1) + padding])
         fig_height = n_bars * (bar_height + margin)# + padding
+        axes.invert_yaxis() # temp changing this
         
         fig.set_figheight(fig_height)
 
         width_inches = 10
         height_inches = n_bars * margin + padding
         fig.set_size_inches(width_inches, height_inches)
-        fig.subplots_adjust(top=0.85)
+        # fig.subplots_adjust(top=0.85)
+        fig.subplots_adjust(top=1)
         # --------------------------------          
 
 

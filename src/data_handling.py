@@ -19,7 +19,20 @@ import re
 import shapes
 import topological_computations
 
+def sample_from_circle(n_pts=100, variation=0.1, outlier=False):
+    if outlier is True: 
+        n_pts = n_pts - 1
 
+    r = 1
+    t = np.linspace(0, 2*np.pi * (n_pts-1)/n_pts, n_pts)
+    x = r*np.cos(t) + variation * np.random.rand(n_pts)
+    y = r*np.sin(t) + variation * np.random.rand(n_pts)
+    output = np.vstack((x,y)).transpose()
+
+    if outlier is True:
+        output = np.append(output,[[0,0]],axis=0)
+    
+    return output
 
 def createData(nPoints, type, variation = 0.1, ambient_dim=2, outliers=False):
     ''' Generate point cloud data of type 'type' and consiting of 'nPoints' points.
@@ -462,20 +475,23 @@ def loadVarsFromFile(filename):
                                      np.asarray(ellipsoid['axesLengths'])))
         vars['ellipsoidList'] = ellipsoidList
 
-    if 'ellipsoidList' in jsonVars:
-        ellipsoidListRaw = jsonVars['ellipsoidList']
+    # if 'ellipsoidList' in jsonVars:
+    #     ellipsoidListRaw = jsonVars['ellipsoidList']
+    if 'ellipsoid_list' in jsonVars:
+        ellipsoidListRaw = jsonVars['ellipsoid_list']
         ellipsoidList = []
         for ellipsoid in ellipsoidListRaw:
             ellipsoidList.append(topological_computations.Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
                                      np.asarray(ellipsoid['axesLengths'])))
-        vars['ellipsoidList'] = ellipsoidList
+        vars['ellipsoid_list'] = ellipsoidList
 
-    if 'simplexTreeEllipsoids' in jsonVars:
-        simplexTreeEllipsoidsRaw = jsonVars['simplexTreeEllipsoids']
+
+    if 'simplex_tree_ellipsoids' in jsonVars:
+        simplexTreeEllipsoidsRaw = jsonVars['simplex_tree_ellipsoids']
         simplexTreeEllipsoids = gd.SimplexTree()
         for simplexTreeEntry in simplexTreeEllipsoidsRaw:
             simplexTreeEllipsoids.insert(simplexTreeEntry[0],simplexTreeEntry[1])
-        vars['simplexTreeEllipsoids'] = simplexTreeEllipsoids
+        vars['simplex_tree_ellipsoids'] = simplexTreeEllipsoids
 
     if 'simplexTreeRips' in jsonVars:        
         simplexTreeRipsRaw = jsonVars['simplexTreeRips']
@@ -678,8 +694,10 @@ def read_pd0_and_pd1(path):
             vars = json.load(f)
 
     
-    pd0 = []
-    pd1 = []
+    pdE0 = []
+    pdE1 = []
+    pdR0 = []
+    pdR1 = []
     label = None
 
     if 'barcodeEllipsoids' in vars:
@@ -688,6 +706,14 @@ def read_pd0_and_pd1(path):
         barcode_ellipsoids = vars['barcode_ellipsoids']
     else:
         exit('The file ' + path + ' does not contain the ellipsoids barcode.')
+
+    if 'barcodeRips' in vars:
+        barcode_rips = vars['barcodeRips']
+    elif 'barcode_rips' in vars:
+        barcode_rips = vars['barcode_rips']
+    else:
+        exit('The file ' + path + ' does not contain the Rips barcode.')
+
     if 'points' in vars:
         points = vars['points']
     if 'label' in vars:
@@ -695,11 +721,17 @@ def read_pd0_and_pd1(path):
 
     for bar in barcode_ellipsoids:
         if bar[0] == 0:
-            pd0.append(bar[1])
+            pdE0.append(bar[1])
         elif bar[0] == 1:
-            pd1.append(bar[1])
+            pdE1.append(bar[1])
 
-    return pd0, pd1, points, label
+    for bar in barcode_rips:
+        if bar[0] == 0:
+            pdR0.append(bar[1])
+        elif bar[0] == 1:
+            pdR1.append(bar[1])
+
+    return pdE0, pdE1, pdR0, pdR1, points, label
 
 def remove_dim_from_barcode(barcode):
 
@@ -742,51 +774,75 @@ def import_turkevs_transformed(folder):
 
     files_per_transformation = int(number_of_files / number_of_transformations)
 
-    pds0 = {}
-    pds1 = {}
+    pdsE0 = {}
+    pdsE1 = {}
+    pdsR0 = {}
+    pdsR1 = {}
     points = {}
     labels = [None] * files_per_transformation
 
     for transformation in transformations:
-        pds0[transformation] = [None]*files_per_transformation
-        pds1[transformation] = [None]*files_per_transformation
+        pdsE0[transformation] = [None]*files_per_transformation
+        pdsE1[transformation] = [None]*files_per_transformation
+        pdsR0[transformation] = [None]*files_per_transformation
+        pdsR1[transformation] = [None]*files_per_transformation
         points[transformation] = [None]*files_per_transformation
     # --------------------------------------------------
 
     for path in paths:
         transformation, index = parse_turkevs_filename(path)
 
-        pd0, pd1, points_, label = read_pd0_and_pd1(path)
-        pds0[transformation][index] = pd0
-        pds1[transformation][index] = pd1
+        pdE0, pdE1, pdR0, pdR1, points_, label = read_pd0_and_pd1(path)
+        pdsE0[transformation][index] = pdE0
+        pdsE1[transformation][index] = pdE1
+        pdsR0[transformation][index] = pdR0
+        pdsR1[transformation][index] = pdR1
         points[transformation][index] = points_
         labels[index] = label
 
 
     # -------- Pad to max length ----------
-    max_pd0_length = []
-    max_pd1_length = []
+    max_pdE0_length = []
+    max_pdE1_length = []
 
     for transformation in transformations:
 
         # Transform list of 0-dim PDs with different number of cycles into an array of PDs with the same number of cycles. 
-        pds0_length = [len(pd) for pd in pds0[transformation]]
-        max_pd0_length.append(max(pds0_length))
+        pdsE0_length = [len(pd) for pd in pdsE0[transformation]]
+        max_pdE0_length.append(max(pdsE0_length))
 
         # Transform list of 1-dim PDs with different number of cycles into an array of PDs with the same number of cycles.    
-        pds1_length = [len(pd) for pd in pds1[transformation]]
-        max_pd1_length.append(max(pds1_length)) 
+        pdsE1_length = [len(pd) for pd in pdsE1[transformation]]
+        max_pdE1_length.append(max(pdsE1_length)) 
         
     for transformation in transformations:
-        pds0[transformation] = extend_pds_to_length(pds0[transformation], max(max_pd0_length))
-        pds1[transformation] = extend_pds_to_length(pds1[transformation], max(max_pd1_length))
+        pdsE0[transformation] = extend_pds_to_length(pdsE0[transformation], max(max_pdE0_length))
+        pdsE1[transformation] = extend_pds_to_length(pdsE1[transformation], max(max_pdE1_length))
+    # ------------------------------------
+    # -------- Pad to max length ----------
+    max_pdR0_length = []
+    max_pdR1_length = []
+
+    for transformation in transformations:
+
+        # Transform list of 0-dim PDs with different number of cycles into an array of PDs with the same number of cycles. 
+        pdsR0_length = [len(pd) for pd in pdsR0[transformation]]
+        max_pdR0_length.append(max(pdsR0_length))
+
+        # Transform list of 1-dim PDs with different number of cycles into an array of PDs with the same number of cycles.    
+        pdsR1_length = [len(pd) for pd in pdsR1[transformation]]
+        max_pdR1_length.append(max(pdsR1_length)) 
+        
+    for transformation in transformations:
+        pdsR0[transformation] = extend_pds_to_length(pdsR0[transformation], max(max_pdR0_length))
+        pdsR1[transformation] = extend_pds_to_length(pdsR1[transformation], max(max_pdR1_length))
     # ------------------------------------
 
     labels = np.asarray(labels)
 
-    print(labels)
+    # print(labels)
 
-    return pds0, pds1, points, labels
+    return pdsE0, pdsE1, pdsR0, pdsR1, points, labels
 
 
 

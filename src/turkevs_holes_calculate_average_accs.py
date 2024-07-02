@@ -16,8 +16,9 @@ if __name__ == '__main__':
 
     parentfolder = 'data/turkevs_20240529/data'
     id = 'id=0005' # 0001 is the first downsampled, also calculated with the prev version of the code
-
     path_results = os.path.join(parentfolder, id+'_results')
+
+    path_results = 'data/turkevs_20240529/data/id=0005_results_20240605_144652'
     if not os.path.isdir(path_results):
         exit('Error: folder ' + path_results + ' does not exist.')
 

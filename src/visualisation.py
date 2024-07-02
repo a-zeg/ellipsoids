@@ -323,7 +323,7 @@ def visualisationFromFile(\
 
     barcodeEllipsoids = reducedBarcodeEllipsoids
     barcodeRips = reducedBarcodeRips
-    xAxisEnd = max(maxBarEndEllipsoids, maxBarEndRips) * 1.1
+    xAxisEnd = max(maxBarEndEllipsoids, maxBarEndRips) * 1.1 # TODO this won't work well if the filtration is negative
 
     print('Plotting...')
 

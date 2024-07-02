@@ -5,13 +5,13 @@ from os.path import isfile, join
 
 ###### User input ######
 filename = \
-    "data/ellipsoids_dataType=sphere_nPts=100_nbhdSize=10axesRatios=array([3, 3, 1])_seed=0_20240320_020017.json"
+    "data/shapes/ellipsoids_data_type=figure_eight_n_pts=200_nbhd_size=5_axes_ratios=[3 1]_seed=0__20240430_163540.json"
 
-folder = "data/shapes"
+# folder = "data/shapes"
 
 rPlot = 0.2
-nBarsDim0 = 1
-nBarsDim1 = 1
+nBarsDim0 = 5
+nBarsDim1 = 10
 nBarsDim2 = 0
 
 savePlot = True

@@ -138,7 +138,7 @@ def run_experiments(json_data_folder, results_path):
     print("TRAIN_SIZES = ", TRAIN_SIZES)
 
 
-    _, pde1, points_dict_of_lists, labels = data_handling.import_turkevs_transformed(json_data_folder)
+    _, pde1, _, pdr1, points_dict_of_lists, labels = data_handling.import_turkevs_transformed(json_data_folder)
     data_pc_trnsfs, labels_check = get_points_and_labels_from_dict(points_dict_of_lists)
     data_pc = data_pc_trnsfs['std']
     num_point_clouds = len(data_pc)
@@ -171,6 +171,13 @@ def run_experiments(json_data_folder, results_path):
     data_pde_test_trnsfs = select_dict_data(pde1, test_indices)
     accs["PHE"] = calculate_accuracy_trnsfs(ph_ml, data_pde_train, labels_train, data_pde_test_trnsfs, labels_test, TRAIN_SIZES, results_path=results_path, name='PHE')
     pipelines.append('PHE')
+
+    # Rips
+    print("\n\nReading in  ellipsoids PDs (input for PH)...")
+    data_pde_train = pdr1['std'][train_indices]
+    data_pde_test_trnsfs = select_dict_data(pde1, test_indices)
+    accs["PHR"] = calculate_accuracy_trnsfs(ph_ml, data_pde_train, labels_train, data_pde_test_trnsfs, labels_test, TRAIN_SIZES, results_path=results_path, name='PHR')
+    pipelines.append('PHR')
 
     # PDs.
     print("\n\nCalculating PDs (input for PH)...")
@@ -248,7 +255,9 @@ if __name__ == '__main__':
             os.makedirs(path_results)
             print('Created folder ' + path_results)
         else:
-            path_results = path_results +'_'+ data_handling.get_timestamp()
+            path_results = path_results + data_handling.get_timestamp()
+            os.makedirs(path_results)
+            print('Created folder ' + path_results)
 
         data_folder = os.path.join(parentfolder, id)
 
