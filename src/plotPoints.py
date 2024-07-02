@@ -1,6 +1,6 @@
 from visualisation import visualisationFromFile
 from datetime import datetime
-from data_handling import loadVarsFromFile
+from data_handling import read_variables
 from visualisation import plotDataPoints
 from os import listdir
 from os.path import isfile, join
@@ -14,7 +14,7 @@ filename = \
 # folder = "data/shapes"
 
 
-vars = loadVarsFromFile(filename)
+vars = read_variables(filename)
 
 points = vars['points']
 points = np.asarray(points)

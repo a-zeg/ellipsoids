@@ -16,8 +16,14 @@ from datetime import datetime
 import pickle
 import re
 
-import shapes
 import topological_computations
+
+# from visualisation import visualisationFromFile
+from datetime import datetime
+from os import listdir
+from os.path import isfile, join
+
+
 
 def sample_from_circle(n_pts=100, variation=0.1, outlier=False):
     if outlier is True: 
@@ -34,81 +40,58 @@ def sample_from_circle(n_pts=100, variation=0.1, outlier=False):
     
     return output
 
-def createData(nPoints, type, variation = 0.1, ambient_dim=2, outliers=False):
-    ''' Generate point cloud data of type 'type' and consiting of 'nPoints' points.
-    :nPoints: Number of points to generate
-    :type: Type of data (e.g. 'circle', 'ellipse', 'Cassini_oval')
-    :variation: Amount of variation from the :type:
-    :dim: Not used yet
-    :return: nPoints x dim numpy array
-    '''
-    np.random.seed(0)
-
-    if type == 'circle':
-        if outliers is True: nPoints = nPoints - 1
-        r = 1
-        t = np.linspace(0, 2*np.pi * (nPoints-1)/nPoints, nPoints)
-        x = r*np.cos(t) + variation * np.random.rand(nPoints)
-        y = r*np.sin(t) + variation * np.random.rand(nPoints)
-        output = np.vstack((x,y)).transpose()
-
-        if outliers is True:
-            output = np.append(output,[[0,0]],axis=0)
-
-    elif type == 'ellipse':
-        t = np.linspace(0, 2*np.pi * (nPoints-1)/nPoints, nPoints)
-        a = 2
-        b = 1
-        x = a * np.cos(t) + variation * np.random.rand(nPoints)
-        y = b * np.sin(t) + variation * np.random.rand(nPoints)
-        output = np.vstack((x,y)).transpose()
-
-    elif type == 'Cassini_oval':
-        t = np.linspace(-1, 1, int(nPoints/2))
-        #t = np.sign(t)*np.abs(t)**(1/4)
-        x = np.concatenate((t,t)) + variation * np.random.rand(nPoints)
-        yh = (t**2 + 0.5) * np.sqrt(1 - t**2)
-        y = np.concatenate((-yh, yh)) + variation * np.random.rand(nPoints)
-        
-        output = np.vstack((x,y)).transpose()
-
-    elif type == 'sphere':
-        r = 1
-
-        vec = np.random.randn(ambient_dim, nPoints)
-        vec /= np.linalg.norm(vec, axis=0)
-        output = vec.transpose()
-
-    elif type == 'torus':
-        r = 1
-        R = 2
-
-        nPtsSampled = 0
-        theta = np.zeros([nPoints])
-        phi = np.zeros([nPoints])
-
-        # rejection sampling
-        while nPtsSampled < nPoints:
-            thetaSample = 2 * np.pi * np.random.rand()
-            phiSample = 2 * np.pi * np.random.rand()
-            W = 2 * np.pi * np.random.rand()
-
-            if W <= (R + r * np.cos(thetaSample))/(R+r):
-                theta[nPtsSampled] = thetaSample
-                phi[nPtsSampled] = phiSample
-                nPtsSampled += 1
 
 
-            x = (R + r * np.cos(theta)) * np.cos(phi)
-            y = (R + r * np.cos(theta)) * np.sin(phi)
-            z = r * np.sin(theta)
+def sample_from_ellipse(n_pts=100, a=2, b=1, variation=0.1):
+    t = np.linspace(0, 2*np.pi * (n_pts-1)/n_pts, n_pts)
+    x = a * np.cos(t) + variation * np.random.rand(n_pts)
+    y = b * np.sin(t) + variation * np.random.rand(n_pts)
+    return np.vstack((x,y)).transpose()
 
-        output = np.vstack((x,y,z)).transpose()
 
-    else:
-        raise Exception(type + " is an invalid type of data.")
+
+def sample_from_cassini_oval(n_pts=100, variation=0.1):
+    t = np.linspace(-1, 1, int(n_pts/2))
+    #t = np.sign(t)*np.abs(t)**(1/4)
+    x = np.concatenate((t,t)) + variation * np.random.rand(n_pts)
+    yh = (t**2 + 0.5) * np.sqrt(1 - t**2)
+    y = np.concatenate((-yh, yh)) + variation * np.random.rand(n_pts)
     
-    return output
+    return np.vstack((x,y)).transpose()
+
+
+
+def sample_from_sphere(n_pts=100, ambient_dim=3, r=1):
+    vec = np.random.randn(ambient_dim, n_pts)
+    vec /= np.linalg.norm(vec, axis=0)
+    return vec.transpose()
+
+
+
+def sample_from_torus(n_pts=100, R=2, r=1):
+    nPtsSampled = 0
+    theta = np.zeros([n_pts])
+    phi = np.zeros([n_pts])
+
+    # rejection sampling
+    while nPtsSampled < n_pts:
+        thetaSample = 2 * np.pi * np.random.rand()
+        phiSample = 2 * np.pi * np.random.rand()
+        W = 2 * np.pi * np.random.rand()
+
+        if W <= (R + r * np.cos(thetaSample))/(R+r):
+            theta[nPtsSampled] = thetaSample
+            phi[nPtsSampled] = phiSample
+            nPtsSampled += 1
+
+
+        x = (R + r * np.cos(theta)) * np.cos(phi)
+        y = (R + r * np.cos(theta)) * np.sin(phi)
+        z = r * np.sin(theta)
+
+    return np.vstack((x,y,z)).transpose() 
+
+
 
 def figure_eight(n, a, b):
     # Taken from Bastian Rieck
@@ -141,6 +124,8 @@ def figure_eight(n, a, b):
     X += np.random.default_rng().uniform(0.05, 0.10, size=(n, 2))
     return X
 
+
+
 def discretePDispersion(nPts, points):
     # Find a convex hull in O(N log N)
 
@@ -171,6 +156,8 @@ def discretePDispersion(nPts, points):
 
     return P
 
+
+
 def imageToCoordinates(image, scaling = 10):
     [height,width] = image.shape
     positiveValues = sum(sum(image>0))
@@ -184,191 +171,55 @@ def imageToCoordinates(image, scaling = 10):
                 k = k+1
 
     return np.flip(coordinates,1)
-    # return coordinates
+
+
+
+def remove_nan(np_array: np.array):
+    if np.isnan(np_array).any():
+        print('Warning: NaN values from a numpy array will be removed.')
+        points = points[~np.isnan(points).any(axis=1)]
     
-def importPoints(**kwargs):
-    #     nPts = 0, 
-    #     dataType='circle', 
-    #     dim=2, 
-    #     variation=0.1, 
-    #     outliers=False, 
-    #     # meshFile='../data/61.off', 
-    #     filename='',
-    #     maxminSubsampling = False,
-    #     randomSubsampling = True,
-    #     seed=0
-    # ):
-
-    data_type_params = {}
-    points = None
-
-    if 'path' in kwargs:
-        path = kwargs['path']
-
-        if path.endswith('.mat'):
-            try:
-                points = np.asarray(loadmat(path)['maxmin_points']) # size: 6040 x 24 
-            except IOError:
-                print('Error: file does not exist.')
-        
-        elif path.endswith('.off'):
-            try: 
-                points = readOFF(filename)
-            except IOError:
-                print('Error: file does not exist.')
-
-        # elif path.endswith('.ply'):
-        #     try:
-        #         pcl = open3d.io.read_point_cloud(path)
-        #     except IOError:
-        #         print('Error: file does not exist.')
-        #     points = np.asarray(pcl.points) 
-
-        elif path.endswith('.txt'):
-            try:
-                points = genfromtxt(path, delimeter=',')
-            except IOError:
-                print('Error: file does not exist.')
-
-            if np.isnan(points).any():
-                print('Warning: the dataset contains NaN values, which will be removed.')
-                points = points[~np.isnan(points).any(axis=1)]
 
 
-        filename = os.path.basename(path)
-        data_type_params['file'] = filename 
+def import_mnist():
+    from keras.datasets import mnist
+    (train_X, train_y), (test_X, test_y) = mnist.load_data()
+    coordinates = imageToCoordinates(train_X[1])
+    # from matplotlib import pyplot as plt
+    # plt.scatter(coordinates[:,0], coordinates[:,1])
+    # ax = plt.gca()
+    # ax.set_aspect('equal')
+    # plt.show()
+    return coordinates
 
-    else:
-        if 'data_type' in kwargs:
-            dataType = kwargs['data_type']
 
-            match dataType:
-                case 'circle':
-                    try: 
-                        n_pts = kwargs['n_pts']
-                    except NameError:
-                        print('Please provide the number of points.')
 
-                    if 'variation' in kwargs:
-                        variation = kwargs['variation']
-                    else:
-                        variation = False
+def import_maxmin_mat(path: str):
+    return np.asarray(loadmat(path)['maxmin_points']) # size: 6040 x 24 
 
-                    if 'outliers' in kwargs:
-                        outliers = kwargs['outliers']
-                    else:
-                        outliers = False
 
-                    points = createData(n_pts, 'circle', variation=variation, outliers=outliers)
-                    data_type_params = f'{dataType=}' + '_' + f'{n_pts=}'
 
-                case 'sphere':
-                    try:
-                        ambient_dim = kwargs['ambient_dim']
-                    except NameError:
-                        print('Please provide the ambient dimension.')
+def saveMAT(variable, filename, varname='points'):
+    pointsDict = {varname: variable}
+    savemat(filename, pointsDict)
 
-                    try:
-                        n_pts = kwargs['n_pts']
-                    except NameError:
-                        print('Please provide the number of points.')
 
-                    points = createData(n_pts, 'sphere', dim=ambient_dim)
 
-                    # points= shapes.sample_from_sphere(n=nPts, d=(dim-1), seed=0)
+def save_pentagon_points():
+    filenameSaved = 'pentagonsamplesSmall2.mat'
 
-                case 'torus':
-                    try:
-                        n_pts = kwargs['n_pts']
-                    except NameError:
-                        print('Please provide the ambient dimension.')
-
-                    points = createData(n_pts, 'torus')
-
-                case 'annulus':
-                    try:
-                        n_pts = kwargs['n_pts']
-                    except NameError:
-                        print('Please provide the ambient dimension.')
-
-                    if 'inner_radius' in kwargs:
-                        inner_radius = kwargs['inner_radius']
-                    else:
-                        inner_radius = 0.4
-                    
-                    if 'outer_radius' in kwargs:
-                        outer_radius = kwargs['outer_radius']
-                    else:
-                        outer_radius = 1
-
-                    if 'seed' in kwargs:
-                        seed = kwargs['seed']
-                    else:
-                        seed = 0
-
-                    points= shapes.sample_from_annulus(n=n_pts, r=inner_radius, R=outer_radius, seed=seed)
-                
-                case 'figure_eight':
-                    try:
-                        n_pts = kwargs['n_pts']
-                    except NameError:
-                        print('Please provide the ambient dimension.')
-
-                    if 'figure_eight_scale' in kwargs:
-                        figure_eight_scale = kwargs['figure_eight_scale']
-                    else:
-                        figure_eight_scale = 1
-
-                    if 'figure_eight_neck_size' in kwargs:
-                        figure_eight_neck_size = kwargs['figure_eight_neck_size']
-                    else:
-                        figure_eight_neck_size = 0.1
-
-                    points = figure_eight(n_pts, figure_eight_scale, figure_eight_neck_size)
-
-                case 'mnist':
-                    from keras.datasets import mnist
-
-                    (train_X, train_y), (test_X, test_y) = mnist.load_data()
-                    coordinates = imageToCoordinates(train_X[1])
-                    from matplotlib import pyplot as plt
-                    # plt.scatter(coordinates[:,0], coordinates[:,1])
-                    # ax = plt.gca()
-                    # ax.set_aspect('equal')
-                    # plt.show()
-
-                    points = coordinates
-                
-                case 'turkevs':
-                    try:
-                        points_all = kwargs['points_all']
-                    except NameError:
-                        print('Error: please provide the list of all points.')
-                    
-                    try:
-                        labels_all = kwargs['labels_all']
-                    except NameError:
-                        print('Error: please provide the list of labels.')
-
-                    try:
-                        index = kwargs['index']
-                    except NameError:
-                        print('Error: plese provide the index of the dataset you wish to import.')
-
-                    return points[index], labels_all[index]
-
-                case _:
-                    print("Invalid data type specified.")
-                    exit()
-
-    return points, data_type_params
-        
-
+    points = genfromtxt('pentagonsamplesSmall2.txt', delimiter=',')
+    if np.isnan(points).any():
+        print('The dataset contains NaN values, which will be removed.')
+        points = points[~np.isnan(points).any(axis=1)]
+    
+    saveMAT(points, filenameSaved, varname='pentagonsamples')
 
 
 
 def get_timestamp():
     return datetime.now().strftime("_%Y%m%d_%H%M%S")
+
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -393,9 +244,12 @@ class CustomEncoder(json.JSONEncoder):
         
         return json.JSONEncoder.default(self, obj)
 
-def saveVarsToFile(dictOfVars,
-                   filename=datetime.now().strftime("data/test.json"), 
-                   timestamp=True):
+
+
+def save_variables(
+        dictOfVars,
+        filename=datetime.now().strftime("data/test.json"), 
+        timestamp=True):
     
     print('Saving data to file...')
 
@@ -410,9 +264,13 @@ def saveVarsToFile(dictOfVars,
         outfile.write(json_string)
     print("Data saved to file " + filename + '.')
 
-def saveVarsToFile2(dictOfVars,
-                   filename=datetime.now().strftime("data/test.json"), 
-                   addToStart=False):
+
+
+def continuously_save_variables(
+        dictOfVars,
+        filename=datetime.now().strftime("data/test.json"), 
+        addToStart=False):
+    
     print('Saving data to file...')
     json_string = json.dumps(dictOfVars, cls=CustomEncoder, indent=4)
     if os.path.exists(filename): # if the file already exists, append to it
@@ -432,53 +290,60 @@ def saveVarsToFile2(dictOfVars,
             outfile.write(json_string)
     print("Data saved to file " + filename + '.')
 
-def loadVarsFromFile(filename):
+
+
+def read_variables(filename):
     with open(filename, "r") as f:
-        jsonVars = json.load(f)
+        json_vars = json.load(f)
     
     vars = {}
 
-    if 'dim' in jsonVars:
-        vars['dim'] = jsonVars['dim']
-    elif 'ambient_dim' in jsonVars:
-        vars['ambient_dim'] = jsonVars['ambient_dim']
+    if 'dim' in json_vars:
+        vars['dim'] = json_vars['dim']
+    elif 'ambient_dim' in json_vars:
+        vars['ambient_dim'] = json_vars['ambient_dim']
 
-    if 'rStart' in jsonVars:
-        vars['rStart'] = jsonVars['rStart']
+    if 'rStart' in json_vars:
+        vars['rStart'] = json_vars['rStart']
 
-    if 'rEnd' in jsonVars:
-        vars['rEnd'] = jsonVars['rEnd']
+    if 'rEnd' in json_vars:
+        vars['rEnd'] = json_vars['rEnd']
 
-    if 'rStep' in jsonVars:
-        vars['rStep'] = jsonVars['rStep']
+    if 'rStep' in json_vars:
+        vars['rStep'] = json_vars['rStep']
 
-    if 'rValues' in jsonVars:
-        vars['rValues'] = np.asarray(jsonVars['rValues'])
+    if 'rValues' in json_vars:
+        vars['rValues'] = np.asarray(json_vars['rValues'])
 
-    if 'nbhdSize' in jsonVars:
-        vars['nbhdSize'] = jsonVars['nbhdSize']
-    elif 'nbhd_size' in jsonVars:
-        vars['nbhd_size'] = jsonVars['nbhd_size']
+    if 'nbhdSize' in json_vars:
+        vars['nbhdSize'] = json_vars['nbhdSize']
+    elif 'nbhd_size' in json_vars:
+        vars['nbhd_size'] = json_vars['nbhd_size']
 
-    if 'nPts' in jsonVars:
-        vars['nPts'] = jsonVars['nPts']
+    if 'nPts' in json_vars:
+        vars['nPts'] = json_vars['nPts']
 
-    if 'points' in jsonVars:
+    if 'points' in json_vars:
         # vars['points'] = np.asarray(jsonVars['points'])
-        vars['points'] = jsonVars['points']
+        vars['points'] = json_vars['points']
 
-    if 'ellipseList' in jsonVars:
-        ellipsoidListRaw = jsonVars['ellipseList']
+    if 'ellipseList' in json_vars:
+        ellipsoidListRaw = json_vars['ellipseList']
         ellipsoidList = []
         for ellipsoid in ellipsoidListRaw:
             ellipsoidList.append(topological_computations.Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
                                      np.asarray(ellipsoid['axesLengths'])))
-        vars['ellipsoidList'] = ellipsoidList
+        vars['ellipsoid_list'] = ellipsoidList
+    elif 'ellipse_list' in json_vars:
+        ellipsoidListRaw = json_vars['ellipse_list']
+        ellipsoidList = []
+        for ellipsoid in ellipsoidListRaw:
+            ellipsoidList.append(topological_computations.Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
+                                     np.asarray(ellipsoid['axesLengths'])))
+        vars['ellipsoid_list'] = ellipsoidList
 
-    # if 'ellipsoidList' in jsonVars:
-    #     ellipsoidListRaw = jsonVars['ellipsoidList']
-    if 'ellipsoid_list' in jsonVars:
-        ellipsoidListRaw = jsonVars['ellipsoid_list']
+    if 'ellipsoid_list' in json_vars:
+        ellipsoidListRaw = json_vars['ellipsoid_list']
         ellipsoidList = []
         for ellipsoid in ellipsoidListRaw:
             ellipsoidList.append(topological_computations.Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
@@ -486,38 +351,45 @@ def loadVarsFromFile(filename):
         vars['ellipsoid_list'] = ellipsoidList
 
 
-    if 'simplex_tree_ellipsoids' in jsonVars:
-        simplexTreeEllipsoidsRaw = jsonVars['simplex_tree_ellipsoids']
+    if 'simplex_tree_ellipsoids' in json_vars:
+        simplexTreeEllipsoidsRaw = json_vars['simplex_tree_ellipsoids']
         simplexTreeEllipsoids = gd.SimplexTree()
         for simplexTreeEntry in simplexTreeEllipsoidsRaw:
             simplexTreeEllipsoids.insert(simplexTreeEntry[0],simplexTreeEntry[1])
         vars['simplex_tree_ellipsoids'] = simplexTreeEllipsoids
 
-    if 'simplexTreeRips' in jsonVars:        
-        simplexTreeRipsRaw = jsonVars['simplexTreeRips']
+    if 'simplexTreeRips' in json_vars:        
+        simplexTreeRipsRaw = json_vars['simplexTreeRips']
         simplexTreeRips = gd.SimplexTree()
         for simplexTreeEntry in simplexTreeRipsRaw:
             simplexTreeRips.insert(simplexTreeEntry[0],simplexTreeEntry[1])
         vars['simplexTreeRips'] = simplexTreeRips
+    elif 'simplex_tree_rips' in json_vars:
+        simplexTreeRipsRaw = json_vars['simplex_tree_rips']
+        simplexTreeRips = gd.SimplexTree()
+        for simplexTreeEntry in simplexTreeRipsRaw:
+            simplexTreeRips.insert(simplexTreeEntry[0],simplexTreeEntry[1])
+        vars['simplex_tree_rips'] = simplexTreeRips 
 
-    if 'barcodeEllipsoids' in jsonVars:
-        vars['barcode_ellipsoids'] = jsonVars['barcodeEllipsoids']
-    elif 'barcode_ellipsoids' in jsonVars:
-        vars['barcode_ellipsoids'] = jsonVars['barcode_ellipsoids']
+    if 'barcodeEllipsoids' in json_vars:
+        vars['barcode_ellipsoids'] = json_vars['barcodeEllipsoids']
+    elif 'barcode_ellipsoids' in json_vars:
+        vars['barcode_ellipsoids'] = json_vars['barcode_ellipsoids']
 
-    if 'barcode_rips' in jsonVars:
-        vars['barcode_rips'] = jsonVars['barcode_rips']
-    elif 'barcodeRips' in jsonVars:
-        vars['barcode_rips'] = jsonVars['barcodeRips']
+    if 'barcode_rips' in json_vars:
+        vars['barcode_rips'] = json_vars['barcode_rips']
+    elif 'barcodeRips' in json_vars:
+        vars['barcode_rips'] = json_vars['barcodeRips']
 
-    if 'accs' in jsonVars:
-        vars['accs'] = jsonVars['accs']
+    if 'accs' in json_vars:
+        vars['accs'] = json_vars['accs']
 
-    if 'accs_file_paths' in jsonVars:
-        vars['accs_file_paths'] = jsonVars['accs_file_paths']
+    if 'accs_file_paths' in json_vars:
+        vars['accs_file_paths'] = json_vars['accs_file_paths']
 
     return vars
      
+
 def readOFF(filename):
     file = open(filename, 'r')
     if 'OFF' != file.readline().strip():
@@ -527,19 +399,129 @@ def readOFF(filename):
     faces = [[int(s) for s in file.readline().strip().split(' ')][1:] for i_face in range(nFaces)]
     return np.asarray(verts)
 
+
 def printListOfSimplices(simplexTree):
     generator = simplexTree.get_filtration()
     simplexList = list(generator)
     for splx in simplexList:
         print(splx)
 
+
+
 def readTXT(filename):
     my_data = genfromtxt(filename, delimiter=',')
 
-# from visualisation import visualisationFromFile
-from datetime import datetime
-from os import listdir
-from os.path import isfile, join
+
+
+def get_paths_of_files_in_a_folder(folder, extension='.mat'):
+    filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(extension)]
+    paths = [os.path.join(folder, f) for f in filenames] 
+    return paths
+
+
+
+def remove_dim_from_barcode(barcode):
+
+    result_barcode = []
+    for bar in barcode:
+            result_barcode.append(bar[1])
+    return result_barcode
+
+
+
+def generate_filename(filename_parameters: dict, folder='data', timestamp = ''):
+    '''
+    Generates filename by creating a string from the variables in 
+    filename_parameters and appends the timestamp if the value of 
+    `timestamp` is True.
+    '''
+    filename = 'ellipsoids'
+    for key, value in filename_parameters.items():
+        filename = filename + '_' + key + '=' + str(value)
+
+    if timestamp != '':
+        filename = filename + '_' + timestamp
+
+    return os.path.join(folder, filename)
+
+
+
+def set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params: dict):
+
+    filename_params = {
+        'data_type': data_type,
+        'n_pts': n_pts,
+        'nbhd_size': nbhd_size,
+        'axes_ratios': axes_ratios,
+    }
+
+    filename_params.update(data_type_params)
+
+    return filename_params
+
+
+
+def filter_dictionary(vars_to_save: list[str], dict_all_vars):
+
+    results = {}
+    for var_name in vars_to_save:
+        if var_name in dict_all_vars:
+            results[var_name] = dict_all_vars[var_name]
+        else: 
+            print('Warning: ' + var_name + ' does not exist in the local variables and will not be saved.')
+    
+    return results
+
+
+
+def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, expansion_dim, filename, additional_vars_dict={}):
+    
+    # Specify the names of variables to be saved
+    vars_to_save = [
+        'ambient_dim',
+        'expansion_dim',
+        'nbhd_size',
+        'n_pts',
+        't_total',
+        't_ellipsoids_over_t_rips',
+        'points',
+        'barcode_ellipsoids',
+        'barcode_rips'
+    ]
+
+    if 'ambient_dim' in vars_to_save:
+        ambient_dim = len(points[0])
+    if 'n_pts' in vars_to_save:
+        n_pts = len(points)
+
+    # Calculate barcodes for ellipsoids and Rips complexes
+    barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, t_ellipsoids \
+        = topological_computations.calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
+    barcode_rips, simplex_tree_rips, t_rips \
+        = topological_computations.calculate_rips_barcode(points, expansion_dim=expansion_dim)
+
+    # Get the execution time
+    t_ellipsoids_over_t_rips = t_ellipsoids / t_rips
+    t_total = t_ellipsoids + t_rips
+    print('\nThe total execution time is ' + str(t_total) + '\n')
+
+    # Save variables to file
+    params_dict = filter_dictionary(vars_to_save, locals())
+
+    if additional_vars_dict: # if not empty
+        for key, value in additional_vars_dict.items():
+            params_dict[key] = value
+    
+    save_variables(params_dict, filename=filename)
+
+
+
+
+############################################
+######   turkevs-specific functions   ######
+############################################
+# The rest of this file consists of functions specific to 
+# handling the turkevs data.
 
 # from Turkevs:
 # Transform list of PDs with different number of cycles into an array of PDs with the same number of cycles.
@@ -554,7 +536,7 @@ def extend_pds_to_length(pds, length):
     return pds_ext
 
 
-
+# TODO probably can delete this, there is the more advanced version below
 def readBarcodesInDims0and1(folder, transformation = 'std'):
     filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(".json")]
 
@@ -562,7 +544,6 @@ def readBarcodesInDims0and1(folder, transformation = 'std'):
     pds1 = [None]*1000
 
     for filename in filenames:
-
         if transformation in filename:
 
             name_to_match = 'Turkevs-' + transformation + '-'
@@ -572,7 +553,7 @@ def readBarcodesInDims0and1(folder, transformation = 'std'):
             pd0 = []
             pd1 = []
             print('Reading in the variables... ', end='', flush=True)
-            vars = loadVarsFromFile(folder+'/'+filename)
+            vars = read_variables(folder+'/'+filename)
             barcodeEllipsoids = vars['barcodeEllipsoids']
             #barcodeRips = vars['barcodeRips']
             print('Done.')
@@ -586,7 +567,6 @@ def readBarcodesInDims0and1(folder, transformation = 'std'):
             pds0[meshNumber] = pd0
             pds1[meshNumber] = pd1
 
-
     # Transform list of 0-dim PDs with different number of cycles into an array of PDs with the same number of cycles.     
     pds0_length = [len(pd) for pd in pds0]
     max_pd_length  = max(pds0_length)    
@@ -598,21 +578,8 @@ def readBarcodesInDims0and1(folder, transformation = 'std'):
     pds1 = extend_pds_to_length(pds1, max_pd_length)
 
     return pds0, pds1
-    
-def saveMAT(variable, filename, varname='points'):
 
-    pointsDict = {varname: variable}
-    savemat(filename, pointsDict)
 
-def savePentagonPoints():
-    filenameSaved = 'pentagonsamplesSmall2.mat'
-
-    points = genfromtxt('pentagonsamplesSmall2.txt', delimiter=',')
-    if np.isnan(points).any():
-        print('The dataset contains NaN values, which will be removed.')
-        points = points[~np.isnan(points).any(axis=1)]
-    
-    saveMAT(points, filenameSaved, varname='pentagonsamples')
 
 def import_turkevs_data(picklepath):
     objects = []
@@ -638,12 +605,9 @@ def import_turkevs_data(picklepath):
             i = i + 1
 
     return points_all, labels_all
+ 
 
-def get_paths_of_files_in_a_folder(folder, extension='.mat'):
-    filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(extension)]
-    paths = [os.path.join(folder, f) for f in filenames] 
-    return paths
-    
+
 def parse_turkevs_filename(path):
     '''
     Parses a filename of a JSON file generated by 'calculate_turkevs' and returns the 
@@ -667,12 +631,14 @@ def parse_turkevs_filename(path):
 
     return transformation, index
 
+
+
 def extract_barcodes_in_dim0_and_dim1(filename):
 
     pd0 = []
     pd1 = []
     print('Reading in the variables... ', end='', flush=True)
-    vars = loadVarsFromFile(filename)
+    vars = read_variables(filename)
     print('Done.')
     barcodeEllipsoids = vars['barcodeEllipsoids']
 
@@ -684,15 +650,12 @@ def extract_barcodes_in_dim0_and_dim1(filename):
 
     return pd0, pd1
 
-def initialize_pds0_and_pds1(folder):
-    paths = get_paths_of_files_in_a_folder(folder)
-    pass
+
 
 def read_pd0_and_pd1(path):
 
     with open(path, "r") as f:
             vars = json.load(f)
-
     
     pdE0 = []
     pdE1 = []
@@ -732,13 +695,6 @@ def read_pd0_and_pd1(path):
             pdR1.append(bar[1])
 
     return pdE0, pdE1, pdR0, pdR1, points, label
-
-def remove_dim_from_barcode(barcode):
-
-    result_barcode = []
-    for bar in barcode:
-            result_barcode.append(bar[1])
-    return result_barcode
 
 
 
@@ -840,8 +796,6 @@ def import_turkevs_transformed(folder):
 
     labels = np.asarray(labels)
 
-    # print(labels)
-
     return pdsE0, pdsE1, pdsR0, pdsR1, points, labels
 
 
@@ -864,84 +818,3 @@ def find_subfolder_with_given_id(parentfolder, id):
     return jsondatafolder
 
 
-def generate_filename(filename_parameters: dict, folder='data', timestamp = ''):
-    '''
-    Generates filename by creating a string from the variables in 
-    filename_parameters and appends the timestamp if the value of 
-    `timestamp` is True.
-    '''
-    filename = 'ellipsoids'
-    for key, value in filename_parameters.items():
-        filename = filename + '_' + key + '=' + str(value)
-
-    if timestamp != '':
-        filename = filename + '_' + timestamp
-
-    return os.path.join(folder, filename)
-
-def set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params: dict):
-
-    filename_params = {
-        'data_type': data_type,
-        'n_pts': n_pts,
-        'nbhd_size': nbhd_size,
-        'axes_ratios': axes_ratios,
-    }
-
-    filename_params.update(data_type_params)
-
-    return filename_params
-
-
-def filter_dictionary(vars_to_save: list[str], dict_all_vars):
-
-    results = {}
-    for var_name in vars_to_save:
-        if var_name in dict_all_vars:
-            results[var_name] = dict_all_vars[var_name]
-        else: 
-            print('Warning: ' + var_name + ' does not exist in the local variables and will not be saved.')
-    
-    return results
-
-
-
-def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, expansion_dim, filename, additional_vars_dict={}):
-    
-    # Specify the names of variables to be saved
-    vars_to_save = [
-        'ambient_dim',
-        'expansion_dim',
-        'nbhd_size',
-        'n_pts',
-        't_total',
-        't_ellipsoids_over_t_rips',
-        'points',
-        'barcode_ellipsoids',
-        'barcode_rips'
-    ]
-
-    if 'ambient_dim' in vars_to_save:
-        ambient_dim = len(points[0])
-    if 'n_pts' in vars_to_save:
-        n_pts = len(points)
-
-    # Calculate barcodes for ellipsoids and Rips complexes
-    barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, t_ellipsoids \
-        = topological_computations.calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
-    barcode_rips, simplex_tree_rips, t_rips \
-        = topological_computations.calculate_rips_barcode(points, expansion_dim=expansion_dim)
-
-    # Get the execution time
-    t_ellipsoids_over_t_rips = t_ellipsoids / t_rips
-    t_total = t_ellipsoids + t_rips
-    print('\nThe total execution time is ' + str(t_total) + '\n')
-
-    # Save variables to file
-    params_dict = filter_dictionary(vars_to_save, locals())
-
-    if additional_vars_dict: # if not empty
-        for key, value in additional_vars_dict.items():
-            params_dict[key] = value
-    
-    saveVarsToFile(params_dict, filename=filename)

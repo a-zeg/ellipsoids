@@ -26,7 +26,7 @@ drawEllipsoids = False
 plotDensity = False
 persistenceDim = None # if None, bBarsDimn will be ignored and bars in all dimensions will be plotted
 
-vars = data_handling.loadVarsFromFile(filename)
+vars = data_handling.read_variables(filename)
 
 barcodeEllipsoids = vars['barcode_ellipsoids']
 barcodeRips = vars['barcode_rips']

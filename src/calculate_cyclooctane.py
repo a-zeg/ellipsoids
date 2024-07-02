@@ -17,7 +17,7 @@ for path in paths:
         for nbhd_size in nbhd_sizes:
 
             # Import points
-            points, data_type_params = data_handling.importPoints(path=path)
+            points = data_handling.import_maxmin_mat(path=path)
 
             # Generate the filename for storing the variables 
             n_pts = len(points)

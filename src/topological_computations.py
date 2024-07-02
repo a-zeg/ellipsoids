@@ -357,7 +357,7 @@ def calculateBottleeckDistance(barcode1, barcode2, dim):
 
 def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
     print('Reading in the variables... ', end='', flush=True)
-    vars = data_handling.loadVarsFromFile(filename)
+    vars = data_handling.read_variables(filename)
     if 'expansionDim' in vars and vars['expansionDim'] == expansionDim:
         print('The original barcode is already expanded to the specified dimension.')
         return None
@@ -380,7 +380,7 @@ def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
     }
 
     filename =  filename[:filename.rfind('.')] + '-barcodes_expansionDim=' + f'{expansionDim}' + datetime.now().strftime("_%Y%m%d_%H%M%S") + '.json'
-    data_handling.saveVarsToFile(dictOfVars, filename=filename)
+    data_handling.save_variables(dictOfVars, filename=filename)
 
 def padAxesRatios(axesRatios, dim):
     ''' For high dimensional ellipsoids, it is enough for the user to specify 

@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     for path in paths:
         accs = {}
-        json_vars = data_handling.loadVarsFromFile(path)
+        json_vars = data_handling.read_variables(path)
         if 'accs' in json_vars:
             accs = json_vars['accs']
         else:
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     unique_id = id + data_handling.get_timestamp()
 
     filename_save_vars = os.path.join(path_results,'turkevs_average_' + unique_id)
-    data_handling.saveVarsToFile(vars_to_save, filename=filename_save_vars, timestamp=False)
+    data_handling.save_variables(vars_to_save, filename=filename_save_vars, timestamp=False)
 
     transformations = ["original", "translation", "rotation", "stretch", "shear", "gaussian", "outliers"]
     fig = plots.plot_bar_chart(transformations, average_accs, pipelines)

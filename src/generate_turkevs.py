@@ -51,7 +51,7 @@ def generate_turkevs_datasets(N: int, n: int, filename: str, seed: int, save_to_
     data_pc_trnsfs['labels'] = labels
 
     if save_to_file is True:
-        data_handling.saveVarsToFile(data_pc_trnsfs, filename=filename, timestamp=False)
+        data_handling.save_variables(data_pc_trnsfs, filename=filename, timestamp=False)
 
 
     return data_pc_trnsfs

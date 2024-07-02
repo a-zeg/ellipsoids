@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import barcodePlotting
 import gudhi as gd
-from data_handling import loadVarsFromFile
+from data_handling import read_variables
 from topological_computations import reduceBarcode
 from datetime import datetime
 
@@ -288,7 +288,7 @@ def visualisationFromFile(\
         persistenceDim=0):
 
     print('Reading in the variables... ', end='', flush=True)
-    vars = loadVarsFromFile(filename)
+    vars = read_variables(filename)
 
     if 'barcodeEllipsoids' in vars:
         barcodeEllipsoids = vars['barcodeEllipsoids']

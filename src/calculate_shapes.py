@@ -15,7 +15,7 @@ def calculate_shapes():
 
         if 'seed=0' in path:
             # Import points
-            points, data_type_params = data_handling.importPoints(path=path)
+            points = data_handling.import_maxmin_mat(path=path)
             data_type_params = {'seed': 0}
 
             if 'circle' in path:
