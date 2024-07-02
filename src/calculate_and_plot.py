@@ -1,4 +1,3 @@
-
 from topological_computations import calculate_ellipsoid_barcode
 from topological_computations import calculate_rips_barcode
 from topological_computations import reduceBarcode
@@ -14,20 +13,20 @@ import barcodePlotting
 random.seed(10)
 
 
+
 def calculate_ellipsoid_complex(data_type: str):
 
     output_folder='data/for_paper'
-
     n = 20
 
-    # Import points
     if data_type == 'figure_eight':
         a = 2
         b = 0.5
         points = data_handling.figure_eight(n,a,b)
     elif data_type == 'circle':
         points = data_handling.sample_from_circle(n_pts=n)
-
+    elif data_type == 'sphere':
+        points = data_handling.sample_from_sphere(n_pts=n)
 
     data_type_params={}
     n_pts = len(points)
@@ -47,8 +46,8 @@ def calculate_ellipsoid_complex(data_type: str):
             filename_parameters = set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
             save_filename = generate_filename(filename_parameters, folder=output_folder)
 
-            barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, t_ellipsoids = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
-            barcode_rips, simplex_tree_rips, t_rips = calculate_rips_barcode(points, expansion_dim=expansion_dim)
+            barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, _ = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
+            barcode_rips, _, _ = calculate_rips_barcode(points, expansion_dim=expansion_dim)
 
             dict_vars = {
                 'points' : points,
@@ -58,14 +57,16 @@ def calculate_ellipsoid_complex(data_type: str):
                 'ellipsoid_list' : ellipsoid_list
             }
 
-            data_handling.saveVarsToFile(dict_vars, save_filename, timestamp=True)
+            data_handling.save_variables(dict_vars, save_filename, timestamp=True)
+
+
 
 def plot_from_file(filename, r_plot=0.2):
 
     n_bars_dim0 = 5
     n_bars_dim1 = 3
 
-    dict_vars = data_handling.loadVarsFromFile(filename)
+    dict_vars = data_handling.read_variables(filename)
 
     ellipsoid_list = dict_vars['ellipsoid_list']
     points = dict_vars['points']
@@ -114,18 +115,17 @@ def plot_from_file(filename, r_plot=0.2):
     fig.set_size_inches(12, 8)
     output_name = os.path.splitext(filename)[0] + f'_{r_plot=}.png'
     fig.savefig(output_name, dpi=300)
-    # plt.show()
 
     print('File saved to ' + output_name)
 
 
+
 if __name__ == '__main__':
-    # for calculation:
+    ## for calculation:
     # data_type = 'circle'
     # calculate_ellipsoid_complex(data_type)
 
-    # # for plotting:
+    ## for plotting:
     filename = 'data/for_paper/ellipsoids_data_type=figure_eight_n_pts=200_nbhd_size=5_axes_ratios=[3 1]__20240702_123409.json'
     r_plot = 0.2
     plot_from_file(filename, r_plot=r_plot)
-
