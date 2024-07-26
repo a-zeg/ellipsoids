@@ -57,6 +57,20 @@ def plotEllipsoids(ellipsoidList, r, axes=None):
     for ellipsoid in ellipsoidList:
         plotEllipsoid(ellipsoid, r = r, axes=axes)
 
+def plotCircle(point, r=1, color='grey', axes=None):
+    sample_rate = 100
+    t = np.linspace(0, 2*np.pi, sample_rate)
+    x = point[0] + r*np.cos(t)
+    y = point[1] + r*np.sin(t)
+    if axes is None:
+        plt.plot(x,y,c=color)
+    else:
+        axes.plot(x,y,c=color)
+
+def plotCircles(points, r=1, axes=None):
+    for point in points:
+        plotCircle(point, r=r, axes=axes)
+
 def plotSimplexTree(points, simplexTree, r, axes):
     dim = len(points[0])
     if dim > 3:

@@ -10,19 +10,19 @@ import os
 import random
 import matplotlib.pyplot as plt
 import barcodePlotting
-random.seed(10)
 
 
 
 def calculate_ellipsoid_complex(data_type: str):
+    random.seed(10)
 
     output_folder='data/for_paper'
-    n = 20
+    n = 50
 
     if data_type == 'figure_eight':
         a = 2
         b = 0.5
-        points = data_handling.figure_eight(n,a,b)
+        points = data_handling.figure_eight(n,a,b,variation=0.05)
     elif data_type == 'circle':
         points = data_handling.sample_from_circle(n_pts=n)
     elif data_type == 'sphere':
@@ -47,13 +47,14 @@ def calculate_ellipsoid_complex(data_type: str):
             save_filename = generate_filename(filename_parameters, folder=output_folder)
 
             barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, _ = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
-            barcode_rips, _, _ = calculate_rips_barcode(points, expansion_dim=expansion_dim)
+            barcode_rips, simplex_tree_rips, _ = calculate_rips_barcode(points, expansion_dim=expansion_dim)
 
             dict_vars = {
                 'points' : points,
                 'barcode_ellipsoids' : barcode_ellipsoids,
                 'barcode_rips' : barcode_rips,
                 'simplex_tree_ellipsoids' : simplex_tree_ellipsoids,
+                'simplex_tree_rips' : simplex_tree_rips,
                 'ellipsoid_list' : ellipsoid_list
             }
 
@@ -72,13 +73,15 @@ def plot_from_file(filename, r_plot=0.2):
     points = dict_vars['points']
     points = np.asarray(points)
     simplex_tree_ellipsoids = dict_vars['simplex_tree_ellipsoids']
+    simplex_tree_rips = dict_vars['simplex_tree_rips']
     barcode_ellipsoids = dict_vars['barcode_ellipsoids']
     barcode_rips = dict_vars['barcode_rips']
 
     fig = plt.figure()
     ax_bar_E = fig.add_subplot(222)
     ax_bar_R = fig.add_subplot(224)
-    ax_pts = fig.add_subplot(121)
+    ax_pts = fig.add_subplot(221)
+    ax_ptsR = fig.add_subplot(223)
 
     visualisation.plotEllipses(ellipseList=ellipsoid_list, r=r_plot, axes=ax_pts)
     visualisation.plotSimplexTree(points=points,simplexTree=simplex_tree_ellipsoids,r=r_plot,axes=ax_pts)
@@ -88,9 +91,21 @@ def plot_from_file(filename, r_plot=0.2):
     axes_ratio = axes_ratio.astype(int)
     axes_ratio = list(axes_ratio)
     plt.rcParams['text.usetex'] = True
-
     q = axes_ratio[0]
     ax_pts.set_title(f'{n_pts} points, ' + r'$q$=' + f'{q}, ' + r'$\varepsilon$' + f'={r_plot}')
+
+    visualisation.plotCircles(points=points, r=r_plot, axes=ax_ptsR)
+    visualisation.plotSimplexTree(points=points,simplexTree=simplex_tree_rips,r=r_plot,axes=ax_ptsR)
+    ax_pts.set_aspect('equal', adjustable='box')
+    n_pts = len(points)
+    axes_ratio = ellipsoid_list[0].axesLengths / ellipsoid_list[0].axesLengths[-1]
+    axes_ratio = axes_ratio.astype(int)
+    axes_ratio = list(axes_ratio)
+    plt.rcParams['text.usetex'] = True
+    q = axes_ratio[0]
+    ax_ptsR.set_title(f'{n_pts} points, ' + r'$r=$' + f'{r_plot}')
+
+
 
     reduced_barcode_ellipsoids, maxBarEndEllipsoids = reduceBarcode( \
                         barcode_ellipsoids, \
@@ -119,13 +134,13 @@ def plot_from_file(filename, r_plot=0.2):
     print('File saved to ' + output_name)
 
 
-
 if __name__ == '__main__':
     ## for calculation:
-    # data_type = 'circle'
+    data_type = 'figure_eight'
     # calculate_ellipsoid_complex(data_type)
 
     ## for plotting:
-    filename = 'data/for_paper/ellipsoids_data_type=figure_eight_n_pts=200_nbhd_size=5_axes_ratios=[3 1]__20240702_123409.json'
-    r_plot = 0.2
+    filename = 'data/for_paper/ellipsoids_data_type=figure_eight_n_pts=50_nbhd_size=5_axes_ratios=[3 1]__20240704_201449.json'
+    # filename = str(output_name) + '.json'
+    r_plot = 0.6
     plot_from_file(filename, r_plot=r_plot)

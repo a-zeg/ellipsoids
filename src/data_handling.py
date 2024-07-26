@@ -93,7 +93,7 @@ def sample_from_torus(n_pts=100, R=2, r=1):
 
 
 
-def figure_eight(n, a, b):
+def figure_eight(n, a, b, variation=0):
     # Taken from Bastian Rieck
     """Sample a set of points from a figure eight curve.
 
@@ -115,13 +115,14 @@ def figure_eight(n, a, b):
     np.array
         Array of shape (n, 2). Will contain the sampled points.
     """
-    T = np.linspace(-5, 5, num=n)
+    T = np.linspace(-3.14, 3.14, num=n)
 
     X = a * np.sin(T)
     Y = a * np.sin(T)**2 * np.cos(T) + b * np.cos(T)
 
     X = np.column_stack((X, Y))
-    X += np.random.default_rng().uniform(0.05, 0.10, size=(n, 2))
+    # X += np.random.default_rng().uniform(0.05, 0.10, size=(n, 2))
+    X += np.random.default_rng().uniform(0, variation, size=(n, 2))
     return X
 
 
