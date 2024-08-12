@@ -1,27 +1,28 @@
 import numpy as np
+import gudhi as gd
+import os
+import json
+import pickle
+import re
+
 from numpy import genfromtxt
-# import figure_eight
 from scipy.io import loadmat
 from scipy.io import savemat
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import cdist
-import random
 from os import listdir
 from os.path import isfile, join
-import os
-# import open3d
-import json
-import gudhi as gd
-from datetime import datetime
-import pickle
-import re
-
-import topological_computations
-
-# from visualisation import visualisationFromFile
 from datetime import datetime
 from os import listdir
 from os.path import isfile, join
+
+# import topological_computations
+from .topological_computations import Ellipsoid
+from .topological_computations import calculate_ellipsoid_barcode
+from .topological_computations import calculate_rips_barcode
+from .topological_computations import expandTreeAndCalculateBarcode
+
+from datetime import datetime
 
 
 
@@ -94,7 +95,7 @@ def sample_from_torus(n_pts=100, R=2, r=1):
 
 
 def figure_eight(n, a, b, variation=0):
-    # Taken from Bastian Rieck
+    # adapted from Bastian Rieck
     """Sample a set of points from a figure eight curve.
 
     Parameters
@@ -229,7 +230,7 @@ class CustomEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         
-        elif isinstance(obj, topological_computations.Ellipsoid):
+        elif isinstance(obj, Ellipsoid):
             obj_data = {
                 "center": obj.center,
                 "axes": obj.axes.tolist(),
@@ -293,102 +294,71 @@ def continuously_save_variables(
 
 
 
+def read_variable_from_dict(var_name, dictionary):
+   if var_name in dictionary:
+        vars[var_name] = dictionary[var_name] 
+
+
+
 def read_variables(filename):
     with open(filename, "r") as f:
         json_vars = json.load(f)
+
+    # print('as read')
+    # print(json_vars['barcode_ellipsoids'])
+    # print('\n')
     
-    vars = {}
+    return json_process_variables(json_vars)
 
-    if 'dim' in json_vars:
-        vars['dim'] = json_vars['dim']
-    elif 'ambient_dim' in json_vars:
-        vars['ambient_dim'] = json_vars['ambient_dim']
 
-    if 'rStart' in json_vars:
-        vars['rStart'] = json_vars['rStart']
 
-    if 'rEnd' in json_vars:
-        vars['rEnd'] = json_vars['rEnd']
+def _json_process_ellipsoid_list(ellipsoid_list_raw):
 
-    if 'rStep' in json_vars:
-        vars['rStep'] = json_vars['rStep']
+    ellipsoidList = []
+    for ellipsoid in ellipsoid_list_raw:
+        ellipsoidList.append(Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
+                                    np.asarray(ellipsoid['axesLengths'])))
+    
+    return ellipsoidList
+
+
+
+def _json_process_simplex_tree(simplex_tree_raw):
+
+    simplex_tree = gd.SimplexTree()
+    for simplex_tree_entry in simplex_tree_raw:
+        simplex_tree.insert(simplex_tree_entry[0],simplex_tree_entry[1])
+   
+    return simplex_tree
+
+
+
+def json_process_variables(json_vars: dict):
+
+    vars = json_vars
 
     if 'rValues' in json_vars:
         vars['rValues'] = np.asarray(json_vars['rValues'])
 
-    if 'nbhdSize' in json_vars:
-        vars['nbhdSize'] = json_vars['nbhdSize']
-    elif 'nbhd_size' in json_vars:
-        vars['nbhd_size'] = json_vars['nbhd_size']
+    for name in ['ellipse_list', 'ellipsoid_list', 'ellipseList']: # TODO: for backwards compatibility, maybe can remove it
+        if name in json_vars:
+            vars['ellipsoid_list'] = _json_process_ellipsoid_list(json_vars[name])
+            break
+        # TODO delete the wrong name here.
 
-    if 'nPts' in json_vars:
-        vars['nPts'] = json_vars['nPts']
+    for name in ['simplex_tree_ellipsoids', 'simplexTreeEllipsoids']: # TODO: for backwards compatibility, maybe can remove it
+        if name in json_vars:
+            vars['simplex_tree_ellipsoids'] = _json_process_simplex_tree(json_vars[name])
+            break
 
-    if 'points' in json_vars:
-        # vars['points'] = np.asarray(jsonVars['points'])
-        vars['points'] = json_vars['points']
-
-    if 'ellipseList' in json_vars:
-        ellipsoidListRaw = json_vars['ellipseList']
-        ellipsoidList = []
-        for ellipsoid in ellipsoidListRaw:
-            ellipsoidList.append(topological_computations.Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
-                                     np.asarray(ellipsoid['axesLengths'])))
-        vars['ellipsoid_list'] = ellipsoidList
-    elif 'ellipse_list' in json_vars:
-        ellipsoidListRaw = json_vars['ellipse_list']
-        ellipsoidList = []
-        for ellipsoid in ellipsoidListRaw:
-            ellipsoidList.append(topological_computations.Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
-                                     np.asarray(ellipsoid['axesLengths'])))
-        vars['ellipsoid_list'] = ellipsoidList
-
-    if 'ellipsoid_list' in json_vars:
-        ellipsoidListRaw = json_vars['ellipsoid_list']
-        ellipsoidList = []
-        for ellipsoid in ellipsoidListRaw:
-            ellipsoidList.append(topological_computations.Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
-                                     np.asarray(ellipsoid['axesLengths'])))
-        vars['ellipsoid_list'] = ellipsoidList
-
-
-    if 'simplex_tree_ellipsoids' in json_vars:
-        simplexTreeEllipsoidsRaw = json_vars['simplex_tree_ellipsoids']
-        simplexTreeEllipsoids = gd.SimplexTree()
-        for simplexTreeEntry in simplexTreeEllipsoidsRaw:
-            simplexTreeEllipsoids.insert(simplexTreeEntry[0],simplexTreeEntry[1])
-        vars['simplex_tree_ellipsoids'] = simplexTreeEllipsoids
-
-    if 'simplexTreeRips' in json_vars:        
-        simplexTreeRipsRaw = json_vars['simplexTreeRips']
-        simplexTreeRips = gd.SimplexTree()
-        for simplexTreeEntry in simplexTreeRipsRaw:
-            simplexTreeRips.insert(simplexTreeEntry[0],simplexTreeEntry[1])
-        vars['simplexTreeRips'] = simplexTreeRips
-    elif 'simplex_tree_rips' in json_vars:
-        simplexTreeRipsRaw = json_vars['simplex_tree_rips']
-        simplexTreeRips = gd.SimplexTree()
-        for simplexTreeEntry in simplexTreeRipsRaw:
-            simplexTreeRips.insert(simplexTreeEntry[0],simplexTreeEntry[1])
-        vars['simplex_tree_rips'] = simplexTreeRips 
-
-    if 'barcodeEllipsoids' in json_vars:
-        vars['barcode_ellipsoids'] = json_vars['barcodeEllipsoids']
-    elif 'barcode_ellipsoids' in json_vars:
-        vars['barcode_ellipsoids'] = json_vars['barcode_ellipsoids']
-
-    if 'barcode_rips' in json_vars:
-        vars['barcode_rips'] = json_vars['barcode_rips']
-    elif 'barcodeRips' in json_vars:
-        vars['barcode_rips'] = json_vars['barcodeRips']
-
-    if 'accs' in json_vars:
-        vars['accs'] = json_vars['accs']
-
-    if 'accs_file_paths' in json_vars:
-        vars['accs_file_paths'] = json_vars['accs_file_paths']
+    for name in ['simplex_tree_rips', 'simplexTreeRips']: # TODO: for backwards compatibility, maybe can remove it
+        if name in json_vars:
+            vars['simplex_tree_rips'] = _json_process_simplex_tree(json_vars[name])
+            break
 
     return vars
+     
+
      
 
 def readOFF(filename):
@@ -438,6 +408,7 @@ def generate_filename(filename_parameters: dict, folder='data', timestamp = ''):
     '''
     filename = 'ellipsoids'
     for key, value in filename_parameters.items():
+        # TODO use f strings here
         filename = filename + '_' + key + '=' + str(value)
 
     if timestamp != '':
@@ -497,9 +468,9 @@ def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, 
 
     # Calculate barcodes for ellipsoids and Rips complexes
     barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, t_ellipsoids \
-        = topological_computations.calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
+        = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
     barcode_rips, simplex_tree_rips, t_rips \
-        = topological_computations.calculate_rips_barcode(points, expansion_dim=expansion_dim)
+        = calculate_rips_barcode(points, expansion_dim=expansion_dim)
 
     # Get the execution time
     t_ellipsoids_over_t_rips = t_ellipsoids / t_rips
@@ -514,6 +485,34 @@ def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, 
             params_dict[key] = value
     
     save_variables(params_dict, filename=filename)
+
+
+def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
+    print('Reading in the variables... ', end='', flush=True)
+    vars = read_variables(filename)
+    if 'expansionDim' in vars and vars['expansionDim'] == expansionDim:
+        print('The original barcode is already expanded to the specified dimension.')
+        return None
+    if 'simplexTreeEllipsoids' in vars:
+        simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
+    else: simplexTreeEllipsoids = gd.SimplexTree()
+    if 'simplexTreeRips' in vars:
+        simplexTreeRips = vars['simplexTreeRips']
+    else: simplexTreeRips = gd.SimplexTree()
+    print('Done.')
+    
+    barcodeEllipsoids = expandTreeAndCalculateBarcode(simplexTreeEllipsoids, expansionDim, collapseEdges=collapseEdges)
+    barcodeRips = expandTreeAndCalculateBarcode(simplexTreeRips, expansionDim, collapseEdges=collapseEdges)
+    
+    dictOfVars = {
+        'originalFile': filename, 
+        'expansionDim': expansionDim,
+        'barcodeEllipsoids': barcodeEllipsoids,
+        'barcodeRips': barcodeRips
+    }
+
+    filename =  filename[:filename.rfind('.')] + '-barcodes_expansionDim=' + f'{expansionDim}' + datetime.now().strftime("_%Y%m%d_%H%M%S") + '.json'
+    save_variables(dictOfVars, filename=filename)
 
 
 
@@ -634,16 +633,30 @@ def parse_turkevs_filename(path):
 
 
 
-def extract_barcodes_in_dim0_and_dim1(filename):
+# def extract_barcodes_in_dim0_and_dim1(filename):
+
+#     pd0 = []
+#     pd1 = []
+#     print('Reading in the variables... ', end='', flush=True)
+#     vars = read_variables(filename)
+#     print('Done.')
+#     barcodeEllipsoids = vars['barcodeEllipsoids']
+
+#     for bar in barcodeEllipsoids:
+#         if bar[0] == 0:
+#             pd0.append(bar[1])
+#         elif bar[0] == 1:
+#             pd1.append(bar[1])
+
+#     return pd0, pd1
+
+
+def extract_barcodes_in_dim0_and_dim1(barcode):
 
     pd0 = []
     pd1 = []
-    print('Reading in the variables... ', end='', flush=True)
-    vars = read_variables(filename)
-    print('Done.')
-    barcodeEllipsoids = vars['barcodeEllipsoids']
 
-    for bar in barcodeEllipsoids:
+    for bar in barcode:
         if bar[0] == 0:
             pd0.append(bar[1])
         elif bar[0] == 1:

@@ -1,28 +1,22 @@
 import numpy as np
 import gudhi as gd
+import json
+import os
+import time
+import itertools
+
 from sklearn.decomposition import PCA
 from sklearn.neighbors import KDTree
 from scipy import spatial
 from scipy.linalg import eigh
 from scipy.optimize import minimize_scalar
-import json
-
 from multiprocessing import Pool
 from multiprocessing import cpu_count
-import itertools
-import os
 
-import data_handling
-# from readWriteData import saveVarsToFile
-from datetime import datetime
-
-
-import time
-import data_handling
 
 
 class Ellipsoid:
-    def __init__(self, center, axes, axesLengths):
+    def __init__(self, center: np.array, axes: np.array, axesLengths: np.array):
         self.center = center
         self.axes = axes
         self.axesLengths = axesLengths
@@ -44,36 +38,33 @@ class Ellipsoid:
         return json.dumps(self.toDict(), 
             sort_keys=True, indent=4)
 
-def fitEllipsoid(center, neighbourhood, axesRatios=0):
+
+def fitEllipsoid(center: list, nbhd_pts: np.array, axesRatios: np.array):
     ''' Use PCA to fit an ellipsoid to the given neighbourhood
     :return: ellipsoid of dimension dim with axes obtained from PCA
     '''
     pca = PCA(n_components=len(center))
-    pca.fit(neighbourhood)
+    pca.fit(nbhd_pts)
     axes = pca.components_
     axesLengths = pca.singular_values_
 
-    ## Plots the axesLengths
-    ## (for analysing the dimensionality of the underlying manifold)
-    # import matplotlib.pyplot as plt
-    # plt.bar(np.arange(len(axesLengths)), axesLengths)
-    # plt.show()
-    # input("Press Enter to continue...")
-
     if axesRatios.all() != 0:
-        axesLengths = axesRatios / axesRatios[0]
-        # alt20230927: if r should determine the short axis
-        # axesLengths = axesRatios / axesRatios[-1] 
-        # /alt
+        axesLengths = axesRatios / axesRatios[0] # r determines the long axis (normalising the long axis to 1)
+        # axesLengths = axesRatios / axesRatios[-1] # alt: r determines the short axis
+    else: 
+        exit("Error: axes ratios contain a zero.")
     return Ellipsoid(center, axes, axesLengths)
 
-def fitEllipsoids(points, neighbourhoodSize, axesRatios = 0):
+
+def fitEllipsoids(points, neighbourhoodSize, axesRatios):
     print('Creating KD tree... ', end='', flush=True)
     kdTree = spatial.KDTree(points)
     print('Done.')
     print('Fitting ellipsoids... ', end='', flush=True)
 
     if len(points) < neighbourhoodSize:
+        print('WARNING: the chosen neighbourhood size is too small. \
+              Setting the neighbhourhood size to the total number of points.')
         neighbourhoodSize = len(points)
 
     _,neighbourhoodIdx = kdTree.query(points, neighbourhoodSize)
@@ -113,108 +104,24 @@ def K(s, lambdas, v_squared, r):
     '''
     return 1.-(1./r**2)*np.sum(v_squared*((s*(1.-s))/(1.+s*(lambdas-1.))))
 
-def generateEllipsoidSimplexTree(kdTree, ellipsoidList, queryRadius, filtrationValues):
-    ''' Creates a simplex tree from the ellipsoids by adding an edge between each two points whose 
-    corresponding ellipsoids intersect.
-    :kdTree: KD tree of the initial dataset
-    :ellipsoidList: list of ellipsoids (output of ??)
-    :queryRadius:
-    :filtrationValues:
 
-    :return: gudhi.SimplexTree
-    '''
-    points = kdTree.data
-    nPoints = len(points)
-    simplexTree = gd.SimplexTree()
+def get_max_axes_ratio(ellipsoid: Ellipsoid):
+    max_axis_length = max(ellipsoid.axesLengths)
+    min_axis_length = min(ellipsoid.axesLengths)
 
-    for r in filtrationValues:
-        for i in range(nPoints):
-            simplexTree.insert([i], 0)
-            neighboursIdx = kdTree.query_ball_point(points[i], queryRadius, return_sorted=False)
-            if len(neighboursIdx) > 1:
-                for idx in neighboursIdx:
-                    if (idx != i) and not(simplexTree.find([i,idx])):
-                        if ellipsoidIntersection(ellipsoidList[i], ellipsoidList[idx],r):
-                            simplexTree.insert([i,idx], r)
+    return max_axis_length / min_axis_length
 
-    return simplexTree
 
-def generateEllipsoidSimplexTree2(points, nbhdSize, axesRatios):
-    ''' Creates a simplex tree from the ellipsoids by adding an edge between each two points whose 
-    corresponding ellipsoids intersect.
-    :kdTree: KD tree of the initial dataset
-    :ellipsoidList: list of ellipsoids (output of ??)
-    :queryRadius:
-    :filtrationValues:
 
-    :return: gudhi.SimplexTree
-    '''
+def findIntersectionRadius(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, threshold=0.001, epsilon=0.001, *kwargs):
+
+    dist = np.linalg.norm(ellipsoid1.center - ellipsoid2.center)
     
-    ellipsoidList = fitEllipsoids(points, nbhdSize, axesRatios)
-    longestEllipsoidAxis = max(ellipsoid.axesLengths[0] for ellipsoid in ellipsoidList)
+    max_axes_ratio = max(get_max_axes_ratio(ellipsoid1), 
+                         get_max_axes_ratio(ellipsoid2))
 
-    simplexTree = gd.SimplexTree()
-    distanceMatrix = spatial.distance.squareform(spatial.distance.pdist(points))
-    threshold = 0.001
-    epsilon = 0.001
-
-    print('Calculating ellipsoid simplex tree... ', end='', flush=True)
-
-    nPoints = len(points)
-    for i in range(nPoints):
-        simplexTree.insert([i], 0)
-        for j in range(i+1,nPoints): # j goes from i+1 so as to check for intersections only once per pair of ellipsoids
-            dist = distanceMatrix[i,j]
-            if axesRatios.all() != 0:
-                maxNonIntersectionFiltration = (dist / 2) - epsilon
-                minIntersectionFiltration = dist/2 * max(axesRatios) + epsilon
-            else:
-                maxNonIntersectionFiltration = (dist / 2) - epsilon
-                minIntersectionFiltration = dist/2 * longestEllipsoidAxis + epsilon
-            # alt20230927: if r should determine the short axis
-            # maxNonIntersectionFiltration = (dist / 2) / max(axesRatios) - epsilon
-            # minIntersectionFiltration = dist/2 + epsilon
-            # /alt
-
-            r = (minIntersectionFiltration - maxNonIntersectionFiltration)/2
-
-            while True:
-                if ellipsoidIntersection(ellipsoidList[i], ellipsoidList[j], r):
-                    minIntersectionFiltration = r
-                else: maxNonIntersectionFiltration = r
-
-                if (minIntersectionFiltration - maxNonIntersectionFiltration) < threshold:
-                    # simplexTree.insert([i,j], r)
-                    simplexTree.insert([i,j], 2*r) # alt20230927_2: 2r so that it's comparable to Rips
-                    break
-                else: r = (minIntersectionFiltration + maxNonIntersectionFiltration)/2
-
-    print('Done.')
-    return [simplexTree, ellipsoidList]
-
-
-def findIntersectionRadius(ellipsoid1, ellipsoid2, axesRatios, **kwargs):
-    if 'threshold' not in kwargs:
-        threshold = 0.001
-    if 'epsilon' not in kwargs:
-        epsilon = 0.001
-    if 'dist' not in kwargs:
-        dist = np.linalg.norm(ellipsoid1.center - ellipsoid2.center)
-    if 'axesRatios' in kwargs and kwargs['axesRatios'].all() != 0:
-        maxNonIntersectionFiltration = (dist / 2) - epsilon
-        minIntersectionFiltration = dist/2 * max(kwargs['axesRatios']) + epsilon
-    elif 'longestEllipsoidAxes' in kwargs:
-        maxNonIntersectionFiltration = (dist / 2) - epsilon
-        minIntersectionFiltration = dist/2 * kwargs['longestEllipsoidAxis'] + epsilon
-    else:
-        maxAxesRatio = max(ellipsoid1.axesLengths / min(ellipsoid1.axesLengths) + \
-                           ellipsoid2.axesLengths / min(ellipsoid2.axesLengths))
-        maxNonIntersectionFiltration = (dist / 2) - epsilon
-        minIntersectionFiltration = dist/2 * maxAxesRatio + epsilon
-
-    # temp
     maxNonIntersectionFiltration = (dist / 2) - epsilon
-    minIntersectionFiltration = dist/2 * max(axesRatios) + epsilon
+    minIntersectionFiltration = dist/2 * max_axes_ratio + epsilon
 
     r = (minIntersectionFiltration - maxNonIntersectionFiltration)/2
 
@@ -227,6 +134,7 @@ def findIntersectionRadius(ellipsoid1, ellipsoid2, axesRatios, **kwargs):
             return 2*r # 2r so that it's comparable to Rips
         else: r = (minIntersectionFiltration + maxNonIntersectionFiltration)/2
 
+    
 def generateEllipsoidSimplexTree3(points, nbhdSize, axesRatios):
     ''' list comprehesion '''
 
@@ -264,10 +172,9 @@ def generateEllipsoidSimplexTree4(points, nbhdSize, axesRatios):
     [simplexTree.insert([i],0) for i in np.arange(len(points))]
     
     pairs = np.array([[i,j] for i in np.arange(len(points)) for j in np.arange(i+1,len(points))])
-    tasks = zip([ellipsoidList[i] for i in pairs[:,0]], \
-                [ellipsoidList[j] for j in pairs[:,1]], \
-                itertools.repeat(axesRatios, len(pairs)))
 
+    tasks = zip([ellipsoidList[i] for i in pairs[:,0]], \
+                [ellipsoidList[j] for j in pairs[:,1]])
 
     cpuCores = int(os.environ.get("SLURM_NTASKS", 4))
 
@@ -304,9 +211,7 @@ def expandTreeAndCalculateBarcode(simplexTree, expansionDim, collapseEdges=False
     simplexTreeExpanded.expansion(expansionDim) # expands the simplicial complex to include 
                                                 # dim-dimensional simplices whose 1-skeleton is in simplexTree
     print('Done.')
-    # ###
-    # print('Number of simplices is ' + str(simplexTreeExpanded.num_simplices()))
-    # ###
+
     print('Calculating the barcode of the expanded tree... ', end='', flush=True)
     barcode = simplexTreeExpanded.persistence()
     print('Done.')
@@ -318,6 +223,7 @@ def maxFiltration(simplexTree):
     simplexList = list(generator)
     return max(splx[1] for splx in simplexList)
 
+# TODO those blocks below should be separate functions
 def reduceBarcode(barcode, nBarsDim0 = 1, nBarsDim1 = 0, nBarsDim2 = 0):
     # return only nBarsDimk longest bars in each dimension k
     reducedBarcode = []
@@ -355,32 +261,6 @@ def calculateBottleeckDistance(barcode1, barcode2, dim):
     bottleneckDistance = [gd.bottleneck_distance(i,j) for i,j in zip(npBarcode1, npBarcode2)]
     return bottleneckDistance
 
-def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
-    print('Reading in the variables... ', end='', flush=True)
-    vars = data_handling.read_variables(filename)
-    if 'expansionDim' in vars and vars['expansionDim'] == expansionDim:
-        print('The original barcode is already expanded to the specified dimension.')
-        return None
-    if 'simplexTreeEllipsoids' in vars:
-        simplexTreeEllipsoids = vars['simplexTreeEllipsoids']
-    else: simplexTreeEllipsoids = gd.SimplexTree()
-    if 'simplexTreeRips' in vars:
-        simplexTreeRips = vars['simplexTreeRips']
-    else: simplexTreeRips = gd.SimplexTree()
-    print('Done.')
-    
-    barcodeEllipsoids = expandTreeAndCalculateBarcode(simplexTreeEllipsoids, expansionDim, collapseEdges=collapseEdges)
-    barcodeRips = expandTreeAndCalculateBarcode(simplexTreeRips, expansionDim, collapseEdges=collapseEdges)
-    
-    dictOfVars = {
-        'originalFile': filename, 
-        'expansionDim': expansionDim,
-        'barcodeEllipsoids': barcodeEllipsoids,
-        'barcodeRips': barcodeRips
-    }
-
-    filename =  filename[:filename.rfind('.')] + '-barcodes_expansionDim=' + f'{expansionDim}' + datetime.now().strftime("_%Y%m%d_%H%M%S") + '.json'
-    data_handling.save_variables(dictOfVars, filename=filename)
 
 def padAxesRatios(axesRatios, dim):
     ''' For high dimensional ellipsoids, it is enough for the user to specify 

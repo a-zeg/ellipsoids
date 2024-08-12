@@ -20,8 +20,9 @@
 #     assert correctDict == labelDict
 
 
-from src.main import generate_filename
-from src.data_handling import get_timestamp
+from ellipsoids.data_handling import generate_filename
+from ellipsoids.data_handling import get_timestamp
+from ellipsoids.data_handling import filter_dictionary
 
 
 
@@ -41,7 +42,6 @@ def test_generate_filename():
 
     assert correct_filename == generated_filename
 
-from src.main import filter_dictionary
 
 def test_filter_dictionary():
     var1 = 1

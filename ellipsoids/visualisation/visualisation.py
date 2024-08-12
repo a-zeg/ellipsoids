@@ -1,13 +1,13 @@
-import topological_computations
+from src.topological_computations import Ellipsoid
 import numpy as np
 import matplotlib.pyplot as plt
-import barcodePlotting
+from src.barcodePlotting import plot_persistence_barcode, plot_persistence_density
 import gudhi as gd
-from data_handling import read_variables
-from topological_computations import reduceBarcode
+from src.data_handling import read_variables
+from src.topological_computations import reduceBarcode
 from datetime import datetime
 
-def plotEllipse(ellipse: topological_computations.Ellipsoid, color='grey', r=1, axes=None):
+def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     sampleRate = 100
     t = np.linspace(0, 2*np.pi, sampleRate)
     xTemp = r*ellipse.axesLengths[0]*np.cos(t)
@@ -19,7 +19,7 @@ def plotEllipse(ellipse: topological_computations.Ellipsoid, color='grey', r=1, 
     else:
         axes.plot(x,y,c=color)
 
-def plotEllipsoid(ellipsoid: topological_computations.Ellipsoid, color='grey', r=1, axes=None):
+def plotEllipsoid(ellipsoid: Ellipsoid, color='grey', r=1, axes=None):
     # see https://stackoverflow.com/questions/7819498/plotting-ellipsoid-with-matplotlib
     sampleRate = 100
 
@@ -255,7 +255,7 @@ def visualisation(**kwargs):
         #barcodeEllipsoids = totuple(barcodeEllipsoids)
         print(barcodeEllipsoids[0])
         #exit()
-        barcodePlotting.plot_persistence_density(persistence=barcodeEllipsoidsReduced, axes=axBarE, fontsize=12,\
+        plot_persistence_density(persistence=barcodeEllipsoidsReduced, axes=axBarE, fontsize=12,\
                                                     max_intervals=1000, #dimension=persistenceDim,
                                                     birth_min=birth_min, birth_max=birth_max,
                                                     death_min=death_min, death_max=death_max,
@@ -263,7 +263,7 @@ def visualisation(**kwargs):
                                                     highestColor=highestColor)
     else:
         print('Plotting ellipsoid barcode... ', end='', flush=True)
-        barcodePlotting.plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
+        plot_persistence_barcode(barcodeEllipsoids, inf_delta=0.5, axes=axBarE, fontsize=12,\
                                             axis_start = -0.1, infinity = xAxisEnd, max_intervals=100)
     print('Done.')
     axBarE.set_title('Ellipsoid barcode', fontsize=12)
