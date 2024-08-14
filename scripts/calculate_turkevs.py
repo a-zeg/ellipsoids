@@ -1,10 +1,15 @@
 # from  import get_paths_of_files_in_a_folder
-import data_handling
 import numpy as np
 import os
 import json
 import sys
 import re
+
+sys.path.append(os.path.abspath('.'))
+
+from ellipsoids.data_handling import set_filename_parameters
+from ellipsoids.data_handling import generate_filename
+from ellipsoids.data_handling import calculate_and_save_ellipsoids_and_rips_data
 
 def calculate_turkevs(path: str):
     '''
@@ -26,7 +31,7 @@ def calculate_turkevs(path: str):
 
     id = re.search(r'id=(\d+)', path).group(1)
 
-    subfolder = os.path.join('data', 'id=' + str(id))
+    subfolder = os.path.join('data/test20240814/', 'id=' + str(id))
     if not os.path.isdir(subfolder):
         os.makedirs(subfolder)
         print('Created folder ' + subfolder)
@@ -63,8 +68,8 @@ def calculate_turkevs(path: str):
             # Generate the filename for storing the variables 
             n_pts = len(points)
             data_type_params = {'id': id}
-            filename_parameters = data_handling.set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
-            save_filename = data_handling.generate_filename(filename_parameters, folder=subfolder) 
+            filename_parameters = set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
+            save_filename = generate_filename(filename_parameters, folder=subfolder) 
 
             vars_dict = {}
             vars_dict['label'] = labels[i]
@@ -72,7 +77,7 @@ def calculate_turkevs(path: str):
             vars_dict['transformation'] = transformation
             vars_dict['index'] = i
 
-            data_handling.calculate_and_save_ellipsoids_and_rips_data(
+            calculate_and_save_ellipsoids_and_rips_data(
                 points,
                 nbhd_size,
                 axes_ratios,
@@ -89,8 +94,8 @@ if __name__ == '__main__':
     # filename = 'pc_test_trnsfs_N=100_n=20_id=0008.json'
     # path = os.path.join(folder,filename)
 
-    path = str(sys.argv[1])
-    # path = 'datasets/turkevs/pc_test_trnsfs_N=20_n=20_id=0012.json'
+    # path = str(sys.argv[1])
+    path = 'datasets/turkevs/pc_test_trnsfs_N=20_n=20_id=0012.json'
 
     calculate_turkevs(path)
 

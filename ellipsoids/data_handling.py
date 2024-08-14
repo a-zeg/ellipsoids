@@ -8,21 +8,15 @@ import re
 from numpy import genfromtxt
 from scipy.io import loadmat
 from scipy.io import savemat
-from scipy.spatial import ConvexHull
-from scipy.spatial.distance import cdist
 from os import listdir
 from os.path import isfile, join
 from datetime import datetime
-from os import listdir
-from os.path import isfile, join
 
-# import topological_computations
 from .topological_computations import Ellipsoid
 from .topological_computations import calculate_ellipsoid_barcode
 from .topological_computations import calculate_rips_barcode
 from .topological_computations import expandTreeAndCalculateBarcode
 
-from datetime import datetime
 
 
 
@@ -122,77 +116,8 @@ def figure_eight(n, a, b, variation=0):
     Y = a * np.sin(T)**2 * np.cos(T) + b * np.cos(T)
 
     X = np.column_stack((X, Y))
-    # X += np.random.default_rng().uniform(0.05, 0.10, size=(n, 2))
     X += np.random.default_rng().uniform(0, variation, size=(n, 2))
     return X
-
-
-
-def discretePDispersion(nPts, points):
-    # Find a convex hull in O(N log N)
-
-    # Returned 420 points in testing
-    hull = ConvexHull(points)
-
-    # Extract the points forming the hull
-    hullpoints = points[hull.vertices,:]
-
-    # Naive way of finding the best pair in O(H^2) time if H is number of points on
-    # hull
-    hdist = cdist(hullpoints, hullpoints, metric='euclidean')
-
-    # Get the farthest apart points
-    bestpair = np.unravel_index(hdist.argmax(), hdist.shape)
-
-    P = np.array([hullpoints[bestpair[0]],hullpoints[bestpair[1]]])
-
-    # Now we have a problem
-    print("Finding optimal set...")
-    while len(P)<nPts:
-        print("P size = {0}".format(len(P)))
-        distance_to_P        = cdist(points, P)
-        minimum_to_each_of_P = np.min(distance_to_P, axis=1)
-        best_new_point_idx   = np.argmax(minimum_to_each_of_P)
-        best_new_point = np.expand_dims(points[best_new_point_idx,:],0)
-        P = np.append(P,best_new_point,axis=0)
-
-    return P
-
-
-
-def imageToCoordinates(image, scaling = 10):
-    [height,width] = image.shape
-    positiveValues = sum(sum(image>0))
-    coordinates = np.zeros([positiveValues,2], dtype=float)
-
-    k = 0
-    for i in np.arange(width):
-        for j in np.arange(height):
-            if image[i,j] > 0:
-                coordinates[k,:] = [scaling*j,scaling*i]
-                k = k+1
-
-    return np.flip(coordinates,1)
-
-
-
-def remove_nan(np_array: np.array):
-    if np.isnan(np_array).any():
-        print('Warning: NaN values from a numpy array will be removed.')
-        points = points[~np.isnan(points).any(axis=1)]
-    
-
-
-def import_mnist():
-    from keras.datasets import mnist
-    (train_X, train_y), (test_X, test_y) = mnist.load_data()
-    coordinates = imageToCoordinates(train_X[1])
-    # from matplotlib import pyplot as plt
-    # plt.scatter(coordinates[:,0], coordinates[:,1])
-    # ax = plt.gca()
-    # ax.set_aspect('equal')
-    # plt.show()
-    return coordinates
 
 
 
@@ -379,11 +304,6 @@ def printListOfSimplices(simplexTree):
 
 
 
-def readTXT(filename):
-    my_data = genfromtxt(filename, delimiter=',')
-
-
-
 def get_paths_of_files_in_a_folder(folder, extension='.mat'):
     filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(extension)]
     paths = [os.path.join(folder, f) for f in filenames] 
@@ -403,13 +323,11 @@ def remove_dim_from_barcode(barcode):
 def generate_filename(filename_parameters: dict, folder='data', timestamp = ''):
     '''
     Generates filename by creating a string from the variables in 
-    filename_parameters and appends the timestamp if the value of 
-    `timestamp` is True.
+    filename_parameters and appends the timestamp.
     '''
     filename = 'ellipsoids'
     for key, value in filename_parameters.items():
-        # TODO use f strings here
-        filename = filename + '_' + key + '=' + str(value)
+        filename = "%s_%s=%s" % (filename, key, value)
 
     if timestamp != '':
         filename = filename + '_' + timestamp
@@ -534,51 +452,6 @@ def extend_pds_to_length(pds, length):
             else:
                 pds_ext[s][i] = np.asarray([0, 0]) 
     return pds_ext
-
-
-# TODO probably can delete this, there is the more advanced version below
-def readBarcodesInDims0and1(folder, transformation = 'std'):
-    filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(".json")]
-
-    pds0 = [None]*1000
-    pds1 = [None]*1000
-
-    for filename in filenames:
-        if transformation in filename:
-
-            name_to_match = 'Turkevs-' + transformation + '-'
-
-            meshNumber = re.search(rf'{name_to_match}(\d+)', filename).group(1)
-            meshNumber = int(meshNumber)
-            pd0 = []
-            pd1 = []
-            print('Reading in the variables... ', end='', flush=True)
-            vars = read_variables(folder+'/'+filename)
-            barcodeEllipsoids = vars['barcodeEllipsoids']
-            #barcodeRips = vars['barcodeRips']
-            print('Done.')
-
-            for bar in barcodeEllipsoids:
-                if bar[0] == 0:
-                    pd0.append(bar[1])
-                elif bar[0] == 1:
-                    pd1.append(bar[1])
-
-            pds0[meshNumber] = pd0
-            pds1[meshNumber] = pd1
-
-    # Transform list of 0-dim PDs with different number of cycles into an array of PDs with the same number of cycles.     
-    pds0_length = [len(pd) for pd in pds0]
-    max_pd_length  = max(pds0_length)    
-    pds0 = extend_pds_to_length(pds0, max_pd_length)
-    
-    # Transform list of 1-dim PDs with different number of cycles into an array of PDs with the same number of cycles.    
-    pds1_length = [len(pd) for pd in pds1]
-    max_pd_length  = max(pds1_length)   
-    pds1 = extend_pds_to_length(pds1, max_pd_length)
-
-    return pds0, pds1
-
 
 
 def import_turkevs_data(picklepath):

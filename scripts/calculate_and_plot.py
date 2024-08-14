@@ -8,9 +8,6 @@ import random
 import matplotlib.pyplot as plt
 
 sys.path.append(os.path.abspath('.'))
-print(sys.path)
-
-print(os.path.abspath('.'))
 
 from ellipsoids.topological_computations import calculate_ellipsoid_barcode
 from ellipsoids.topological_computations import calculate_rips_barcode
@@ -22,12 +19,10 @@ from ellipsoids.data_handling import sample_from_circle
 from ellipsoids.data_handling import sample_from_sphere
 from ellipsoids.data_handling import save_variables
 from ellipsoids.data_handling import read_variables
-from ellipsoids.visualisation import plotEllipses
-from ellipsoids.visualisation import plotSimplexTree
-from ellipsoids.visualisation import plotCircles 
+from ellipsoids.visualisation.visualisation import plotEllipses
+from ellipsoids.visualisation.visualisation import plotSimplexTree
+from ellipsoids.visualisation.visualisation import plotCircles 
 from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode
-
-
 
 
 def calculate_ellipsoid_complex(data_type: str):
@@ -157,7 +152,6 @@ if __name__ == '__main__':
     # calculate_ellipsoid_complex(data_type)
 
     ## for plotting:
-    filename = 'data/for_paper/ellipsoids_data_type=figure_eight_n_pts=50_nbhd_size=5_axes_ratios=[3 1]__20240704_201449.json'
-    # filename = str(output_name) + '.json'
+    filename = 'data/for_paper/ellipsoids_data_type=figure_eight_n_pts=50_nbhd_size=5_axes_ratios=[3 1]__20240814_115936.json'
     r_plot = 0.6
     plot_from_file(filename, r_plot=r_plot)

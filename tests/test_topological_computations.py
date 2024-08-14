@@ -7,6 +7,9 @@ from ellipsoids.topological_computations import generateEllipsoidSimplexTree4
 from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.topological_computations import findIntersectionRadius
 from ellipsoids.topological_computations import get_max_axes_ratio
+from ellipsoids.topological_computations import ellipsoidIntersection
+from ellipsoids.topological_computations import reduceBarcode
+from ellipsoids.topological_computations import padAxesRatios
 # from src.topological_computations import get_axes_ratios
 
 def test_fit_ellipsoid():
@@ -23,6 +26,72 @@ def test_fit_ellipsoid():
     assert np.allclose(fitted_ellipsoid.axesLengths, [1, 0.5])
 
 
+def test_ellipsoid_intersection():
+
+    # nearby ellipsoids
+    ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
+    ellipsoid2 = Ellipsoid(np.array([0.1,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
+    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == True
+
+    # far apart ellipsoids
+    ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
+    ellipsoid2 = Ellipsoid(np.array([5,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
+    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == False
+
+    # ellipsoids that touch at one point (along the y-axis)
+    ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,0.5]))
+    ellipsoid2 = Ellipsoid(np.array([0,1]), np.array([[1,0],[0,1]]), np.array([1,0.5]))
+    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == True
+
+    # ellipsoids that touch at one point (along the x-axis)
+    ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,0.5]))
+    ellipsoid2 = Ellipsoid(np.array([2,0]), np.array([[1,0],[0,1]]), np.array([1,0.5]))
+    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == True
+
+    # ellipsoids that are the same
+    ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
+    ellipsoid2 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,1]))    
+    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == True
+
+
+def test_find_intersection_radius():
+
+    center1 = np.asarray([0,0])
+    axes1 = np.asarray([[1,0],[0,1]])
+    axesLengths1 = np.asarray([2,1])
+
+    center2 = np.asarray([1,0])
+    axes2 = np.asarray([[1,0],[0,1]])
+    axesLengths2 = np.asarray([2,1])
+
+
+    ellipsoid1 = Ellipsoid(center1, axes1, axesLengths1)
+    ellipsoid2 = Ellipsoid(center2, axes2, axesLengths2)
+
+    intersection_radius = findIntersectionRadius(ellipsoid1, ellipsoid2)
+    target_intersection_radius = 0.5
+
+    assert np.isclose(intersection_radius, target_intersection_radius, atol=0.01)
+
+
+def test_get_max_axes_ratio():
+
+    center1 = np.array([0,0])
+    axes1 = np.array([[1,0],[0,1]])
+    axes_lengths1 = [3,2]
+    ellipsoid1 = Ellipsoid(center1, axes1, axes_lengths1)
+    target_axes_ratio1 = 3/2
+
+    assert get_max_axes_ratio(ellipsoid1) == target_axes_ratio1 
+
+    center1 = np.array([0,0,0])
+    axes1 = np.array([[1,0,0],[0,1,0],[0,0,1]])
+    axes_lengths2 = [3,2,1]
+    ellipsoid2 = Ellipsoid(center1, axes1, axes_lengths2)
+    target_axes_ratio2 = 3
+
+    assert get_max_axes_ratio(ellipsoid2) == target_axes_ratio2 
+
 
 def _simplex_tree_to_list(simplex_tree: gd.SimplexTree):
 
@@ -34,7 +103,7 @@ def _simplex_tree_to_list(simplex_tree: gd.SimplexTree):
 
 def _simplex_trees_equal(st1: gd.SimplexTree, st2: gd.SimplexTree, atol=0.01):
     ''' Compares if two simplex trees are equal.
-    
+    i
     The reason a simple list comparison doesn't work is because
     the filtrations might differ slightly due to numerical errors.
     
@@ -129,41 +198,48 @@ def test_generate_ellipsoid_simplex_tree4():
 
     assert _simplex_trees_equal(simplex_tree[0], simplex_tree_target_approx)
 
+
+def test_reduce_barcode():
+
+    barcode = [
+        [0, [0,1]],
+        [0, [-0.5, 1]],
+        [1, [-0.3, 0.3]],
+        [42, [-10, 353]]
+    ]
+
+    target_barcode = [
+        [0, [0,1]],
+        [0, [-0.5, 1]]
+    ]
+
+    reduced_barcode, _ = reduceBarcode(barcode, nBarsDim0=2)
+    assert target_barcode == reduced_barcode
+
+
+    target_barcode = [
+        [0, [0,1]]
+    ]
+
+    reduced_barcode, _ = reduceBarcode(barcode, nBarsDim0=1)
+    assert target_barcode == reduced_barcode
+
+
+def test_max_filtration():
+
+    
+    assert True
         
-def test_find_intersection_radius():
 
-    center1 = np.asarray([0,0])
-    axes1 = np.asarray([[1,0],[0,1]])
-    axesLengths1 = np.asarray([2,1])
+def pad_axes_ratios():
 
-    center2 = np.asarray([1,0])
-    axes2 = np.asarray([[1,0],[0,1]])
-    axesLengths2 = np.asarray([2,1])
+    axes_ratios1 = np.array([3,1])
+    dim1 = 3
+    target_axes_ratios1 = np.arary([3,1,1])   
+    assert target_axes_ratios1 == padAxesRatios(axes_ratios1, dim1)
 
 
-    ellipsoid1 = Ellipsoid(center1, axes1, axesLengths1)
-    ellipsoid2 = Ellipsoid(center2, axes2, axesLengths2)
-
-    intersection_radius = findIntersectionRadius(ellipsoid1, ellipsoid2)
-    target_intersection_radius = 0.5
-
-    assert np.isclose(intersection_radius, target_intersection_radius, atol=0.01)
-
-
-def test_get_max_axes_ratio():
-
-    center1 = np.array([0,0])
-    axes1 = np.array([[1,0],[0,1]])
-    axes_lengths1 = [3,2]
-    ellipsoid1 = Ellipsoid(center1, axes1, axes_lengths1)
-    target_axes_ratio1 = 3/2
-
-    assert get_max_axes_ratio(ellipsoid1) == target_axes_ratio1 
-
-    center1 = np.array([0,0,0])
-    axes1 = np.array([[1,0,0],[0,1,0],[0,0,1]])
-    axes_lengths2 = [3,2,1]
-    ellipsoid2 = Ellipsoid(center1, axes1, axes_lengths2)
-    target_axes_ratio2 = 3
-
-    assert get_max_axes_ratio(ellipsoid2) == target_axes_ratio2 
+    axes_ratios2 = np.array([3,1,1,1,1])
+    dim2 = 3
+    target_axes_ratios2 = np.arary([3,1,1])   
+    assert target_axes_ratios2 == padAxesRatios(axes_ratios2, dim2)

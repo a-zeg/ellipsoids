@@ -3,7 +3,6 @@ import gudhi as gd
 import json
 import os
 import time
-import itertools
 
 from sklearn.decomposition import PCA
 from sklearn.neighbors import KDTree
@@ -20,6 +19,13 @@ class Ellipsoid:
         self.center = center
         self.axes = axes
         self.axesLengths = axesLengths
+
+    def __eq__(self, other):
+        if isinstance(other, Ellipsoid):
+            return (np.array_equal(self.center, other.center) and
+                    np.array_equal(self.axes, other.axes) and
+                    np.array_equal(self.axesLengths, other.axesLengths))
+        return False
 
     def toDict(self):
         obj_data = {
@@ -81,6 +87,10 @@ def ellipsoidIntersection(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, r):
     i.e. this paper: https://tisl.cs.toronto.edu/publication/201207-fusion-kalman_filter_fault_detection/fusion12-kalman_filter_fault_detection.pdf
     :return: true or false
     '''
+
+    if ellipsoid1 == ellipsoid2:
+        return True
+
     Sigma_A = np.linalg.multi_dot([\
         np.transpose(ellipsoid1.axes),\
         np.diag(ellipsoid1.axesLengths**2),\
@@ -110,8 +120,6 @@ def get_max_axes_ratio(ellipsoid: Ellipsoid):
     min_axis_length = min(ellipsoid.axesLengths)
 
     return max_axis_length / min_axis_length
-
-
 
 def findIntersectionRadius(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, threshold=0.001, epsilon=0.001, *kwargs):
 
@@ -223,32 +231,59 @@ def maxFiltration(simplexTree):
     simplexList = list(generator)
     return max(splx[1] for splx in simplexList)
 
-# TODO those blocks below should be separate functions
+
+def set_max_bar_end(bar, max_bar_end):
+    bar_end = bar[1][1]
+    if bar_end != float('inf') and bar_end > max_bar_end:
+        max_bar_end = bar_end
+    return max_bar_end
+
 def reduceBarcode(barcode, nBarsDim0 = 1, nBarsDim1 = 0, nBarsDim2 = 0):
-    # return only nBarsDimk longest bars in each dimension k
-    reducedBarcode = []
-    maxBarEnd = 0
+    # return only the first nBarsDimk bars in each dimension k
+    reduced_barcode = []
+    max_bar_end = 0
     for bar in barcode:
         if bar[0] == 0 and nBarsDim0 > 0:
-            reducedBarcode.append(bar)
+            reduced_barcode.append(bar)
             nBarsDim0 = nBarsDim0 - 1
-            barEnd = bar[1][1]
-            if barEnd != float('inf') and barEnd > maxBarEnd:
-                maxBarEnd = barEnd
+            max_bar_end = set_max_bar_end(bar, max_bar_end)
         elif bar[0] == 1 and nBarsDim1 > 0:
-            reducedBarcode.append(bar)
+            reduced_barcode.append(bar)
             nBarsDim1 = nBarsDim1 - 1
-            barEnd = bar[1][1]
-            if barEnd != float('inf') and barEnd > maxBarEnd:
-                maxBarEnd = barEnd
+            max_bar_end = set_max_bar_end(bar, max_bar_end)
         elif bar[0] == 2 and nBarsDim2 > 0:
-            reducedBarcode.append(bar)
+            reduced_barcode.append(bar)
             nBarsDim2 = nBarsDim2 - 1
-            barEnd = bar[1][1]
-            if barEnd != float('inf') and barEnd > maxBarEnd:
-                maxBarEnd = barEnd
+            max_bar_end = set_max_bar_end(bar, max_bar_end)
     
-    return reducedBarcode, maxBarEnd
+    return reduced_barcode, max_bar_end
+    
+# TODO those blocks below should be separate functions
+# def reduceBarcode(barcode, nBarsDim0 = 1, nBarsDim1 = 0, nBarsDim2 = 0):
+#     # return only nBarsDimk longest bars in each dimension k
+#     reducedBarcode = []
+#     maxBarEnd = 0
+#     for bar in barcode:
+#         if bar[0] == 0 and nBarsDim0 > 0:
+#             reducedBarcode.append(bar)
+#             nBarsDim0 = nBarsDim0 - 1
+#             barEnd = bar[1][1]
+#             if barEnd != float('inf') and barEnd > maxBarEnd:
+#                 maxBarEnd = barEnd
+#         elif bar[0] == 1 and nBarsDim1 > 0:
+#             reducedBarcode.append(bar)
+#             nBarsDim1 = nBarsDim1 - 1
+#             barEnd = bar[1][1]
+#             if barEnd != float('inf') and barEnd > maxBarEnd:
+#                 maxBarEnd = barEnd
+#         elif bar[0] == 2 and nBarsDim2 > 0:
+#             reducedBarcode.append(bar)
+#             nBarsDim2 = nBarsDim2 - 1
+#             barEnd = bar[1][1]
+#             if barEnd != float('inf') and barEnd > maxBarEnd:
+#                 maxBarEnd = barEnd
+    
+#     return reducedBarcode, maxBarEnd
 
 def calculateBottleeckDistance(barcode1, barcode2, dim):
     npBarcode1 = np.array()
@@ -262,7 +297,7 @@ def calculateBottleeckDistance(barcode1, barcode2, dim):
     return bottleneckDistance
 
 
-def padAxesRatios(axesRatios, dim):
+def padAxesRatios(axesRatios: np.array, dim: int):
     ''' For high dimensional ellipsoids, it is enough for the user to specify 
     the first few axes. This function will set the remaining axes to 1.'''
     if dim > len(axesRatios):

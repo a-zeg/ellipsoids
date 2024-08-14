@@ -1,11 +1,15 @@
-from visualisation import visualisationFromFile
-from datetime import datetime
-from os import listdir
-from os.path import isfile, join
-import barcodePlotting
+import os
+import sys
 import matplotlib.pyplot as plt
-from topological_computations import reduceBarcode
-import data_handling
+
+from datetime import datetime
+
+
+
+from ellipsoids.visualisation.visualisation import visualisationFromFile
+from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode
+from ellipsoids.topological_computations import reduceBarcode
+from ellipsoids.data_handling import read_variables
 
 ###### User input ######
 filename = \
@@ -26,7 +30,7 @@ drawEllipsoids = False
 plotDensity = False
 persistenceDim = None # if None, bBarsDimn will be ignored and bars in all dimensions will be plotted
 
-vars = data_handling.read_variables(filename)
+vars = read_variables(filename)
 
 barcodeEllipsoids = vars['barcode_ellipsoids']
 barcodeRips = vars['barcode_rips']
@@ -50,7 +54,7 @@ fig, axes = plt.subplots()
 # fig.set_size_inches(10,2)
 # axes.set_ylim([-1,10])
 
-barcodePlotting.plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axes, fontsize=12,\
+plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axes, fontsize=12,\
                                         axis_start = -0.1, infinity = xAxisEnd, max_intervals=100) 
 
 plt.show()
