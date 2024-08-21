@@ -1,1 +1,0 @@
-python3.11 src/batchtest.py $1 $2
