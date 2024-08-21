@@ -1,4 +1,3 @@
-# from  import get_paths_of_files_in_a_folder
 import numpy as np
 import os
 import json
@@ -10,6 +9,8 @@ sys.path.append(os.path.abspath('.'))
 from ellipsoids.data_handling import set_filename_parameters
 from ellipsoids.data_handling import generate_filename
 from ellipsoids.data_handling import calculate_and_save_ellipsoids_and_rips_data
+
+
 
 def calculate_turkevs(path: str):
     '''
@@ -35,15 +36,6 @@ def calculate_turkevs(path: str):
     if not os.path.isdir(subfolder):
         os.makedirs(subfolder)
         print('Created folder ' + subfolder)
-
-    # objects = []
-    # with (open(picklepath, "rb")) as openfile:
-    #     while True:
-    #         try:
-    #             objects.append(pickle.load(openfile))
-    #         except EOFError:
-    #             break
-    # data_transformed = objects[0]
 
     labels = data_pc_trnsfs['labels']
 

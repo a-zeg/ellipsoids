@@ -1,22 +1,24 @@
-import numpy as np
-import gudhi as gd
 import os
+from os import listdir
+from os.path import isfile, join
+import sys
 import json
-import pickle
 import re
+from datetime import datetime
 
+import pickle
+import gudhi as gd
+import numpy as np
 from numpy import genfromtxt
 from scipy.io import loadmat
 from scipy.io import savemat
-from os import listdir
-from os.path import isfile, join
-from datetime import datetime
 
-from .topological_computations import Ellipsoid
-from .topological_computations import calculate_ellipsoid_barcode
-from .topological_computations import calculate_rips_barcode
-from .topological_computations import expandTreeAndCalculateBarcode
+sys.path.append(os.path.abspath('.'))
 
+from ellipsoids.topological_computations import Ellipsoid
+from ellipsoids.topological_computations import calculate_ellipsoid_barcode
+from ellipsoids.topological_computations import calculate_rips_barcode
+from ellipsoids.topological_computations import expandTreeAndCalculateBarcode
 
 
 
@@ -118,6 +120,51 @@ def figure_eight(n, a, b, variation=0):
     X = np.column_stack((X, Y))
     X += np.random.default_rng().uniform(0, variation, size=(n, 2))
     return X
+
+
+
+def sample_from_annulus(n, r, R, seed=None):
+    """Sample points from a 2D annulus.
+
+    This function samples `N` points from an annulus with inner radius `r`
+    and outer radius `R`.
+
+    Parameters
+    ----------
+    n : int
+        Number of points to sample
+
+    r : float
+        Inner radius of annulus
+
+    R : float
+        Outer radius of annulus
+
+    seed : int, instance of `np.random.Generator`, or `None`
+        Seed for the random number generator, or an instance of such
+        a generator. If set to `None`, the default random number
+        generator will be used.
+
+    Returns
+    -------
+    torch.tensor of shape `(n, 2)`
+        Tensor containing sampled coordinates.
+    """
+    if r >= R:
+        raise RuntimeError(
+            'Inner radius must be less than or equal to outer radius'
+        )
+
+    rng = np.random.default_rng(seed)
+    thetas = rng.uniform(0, 2 * np.pi, n)
+
+    # Need to sample based on squared radii to account for density
+    # differences.
+    radii = np.sqrt(rng.uniform(r ** 2, R ** 2, n))
+
+    X = np.column_stack((radii * np.cos(thetas), radii * np.sin(thetas)))
+    return X
+
 
 
 
@@ -228,10 +275,6 @@ def read_variable_from_dict(var_name, dictionary):
 def read_variables(filename):
     with open(filename, "r") as f:
         json_vars = json.load(f)
-
-    # print('as read')
-    # print(json_vars['barcode_ellipsoids'])
-    # print('\n')
     
     return json_process_variables(json_vars)
 
@@ -296,6 +339,7 @@ def readOFF(filename):
     return np.asarray(verts)
 
 
+
 def printListOfSimplices(simplexTree):
     generator = simplexTree.get_filtration()
     simplexList = list(generator)
@@ -304,10 +348,27 @@ def printListOfSimplices(simplexTree):
 
 
 
-def get_paths_of_files_in_a_folder(folder, extension='.mat'):
+def get_paths_of_files_in_a_folder(folder: str, extension='.mat'):
     filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(extension)]
     paths = [os.path.join(folder, f) for f in filenames] 
     return paths
+
+
+
+def get_paths_with_seed(paths, seed: int):
+
+    output_paths = []
+
+    for path in paths:
+        match = re.search(r'seed=(\d+)', path)
+        if match:
+            path_seed = match.group(1)
+            if str(seed) == path_seed:
+                output_paths.append(path)
+        else:
+            ValueError('No match found.')
+
+    return output_paths
 
 
 
@@ -403,6 +464,7 @@ def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, 
             params_dict[key] = value
     
     save_variables(params_dict, filename=filename)
+
 
 
 def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):

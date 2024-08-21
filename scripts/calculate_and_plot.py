@@ -19,9 +19,9 @@ from ellipsoids.data_handling import sample_from_circle
 from ellipsoids.data_handling import sample_from_sphere
 from ellipsoids.data_handling import save_variables
 from ellipsoids.data_handling import read_variables
-from ellipsoids.visualisation.visualisation import plotEllipses
-from ellipsoids.visualisation.visualisation import plotSimplexTree
-from ellipsoids.visualisation.visualisation import plotCircles 
+from ellipsoids.visualisation import plotEllipses
+from ellipsoids.visualisation import plotSimplexTree
+from ellipsoids.visualisation import plotCircles 
 from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode
 
 

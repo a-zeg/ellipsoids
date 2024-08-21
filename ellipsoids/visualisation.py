@@ -1,13 +1,15 @@
 import gudhi as gd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 from datetime import datetime
 
 from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.data_handling import read_variables
 from ellipsoids.topological_computations import reduceBarcode
-from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode, plot_persistence_density
+# from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode, plot_persistence_density
+from gudhi.persistence_graphical_tools import _limit_to_max_intervals, __min_birth_max_death
 
 
 def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
@@ -293,6 +295,8 @@ def visualisation(**kwargs):
     if 'showPlot' in kwargs and kwargs['showPlot'] is True:
         plt.show()
 
+
+
 def visualisationFromFile(\
         filename, \
         nBarsDim0=1, nBarsDim1=0, nBarsDim2=0, \
@@ -380,104 +384,91 @@ def visualisationFromFile(\
 
 
 
-# def plot_barcode(
-#     persistence=[], # rename to 'barcode
-#     alpha=0.6,
-#     max_intervals=20000,
-#     inf_delta=0.1,
-#     legend=None,
-#     colormap=None,
-#     axes=None,
-#     fontsize=16,
-#     axis_start=None,
-#     infinity=None,
-#     bar_height=None,
-# ):
+
+def calculate_inf_delta(x_axis_end_ellipsoids, x_axis_end_rips, x_axis_start = 0, delta = 0.1):
+
+    max_x_axis_end = max(x_axis_end_ellipsoids, x_axis_end_rips)
+    length = (max_x_axis_end - x_axis_start) * delta
+
+    return length / x_axis_end_ellipsoids, length / x_axis_end_rips
+    
+
+def plot_barcode(
+    barcode=[], # rename to 'barcode
+    alpha=0.6,
+    max_intervals=20000,
+    inf_delta=0.1,
+    colormap=None,
+    axes=None,
+    fontsize=16,
+    axis_start=None,
+    infinity=None,
+    bar_height=0.8,
+):
+    '''
+    Adapted from GUDHI's plot_persistence_barcode.
+
+    To have a realistic comparison between barcodes for ellipsoids 
+    and Rips complexes, it is necessary to have the axes start and
+    end at the same values. Since GUDHI's plot_persistence_barcode 
+    only provides a way to set a scaling factor and not the absolute 
+    start and end values, this adaptaion was created.
+    '''
+
+
+    barcode = _limit_to_max_intervals(
+        barcode, max_intervals, key=lambda life_time: life_time[1][1] - life_time[1][0]
+    )
+    (min_birth, max_death) = __min_birth_max_death(barcode)
+    # barcode = sorted(barcode, key=lambda life_time: life_time[1][1] - life_time[1][0])
+    barcode = sorted(barcode, key=lambda birth: birth[1][0])
+
+    delta = (max_death - min_birth) * inf_delta
+    if infinity is None:
+        infinity = max_death + delta
+    if axis_start is None:
+        axis_start = min_birth - delta
+    if axes is None:
+        _, axes = plt.subplots(1, 1)
+    if colormap is None:
+        colormap = plt.cm.Set1.colors
+
+    x = [birth for (dim, (birth, death)) in barcode]
+    y = [(death - birth) if death != float("inf") else (infinity - birth) for (dim, (birth, death)) in barcode]
+    c = [colormap[dim] for (dim, (birth, death)) in barcode]
  
-#     try:
-#         import matplotlib.pyplot as plt
-#         import matplotlib.patches as mpatches
-#         from matplotlib import rc
+    axes.barh(range(len(x)), y, left=x, alpha=alpha, color=c, height=bar_height)
 
-#         if _gudhi_matplotlib_use_tex and _matplotlib_can_use_tex():
-#             plt.rc("text", usetex=True)
-#             plt.rc("font", family="serif")
-#         else:
-#             plt.rc("text", usetex=False)
-#             plt.rc("font", family="DejaVu Sans")
+    dimensions = {item[0] for item in barcode}
+    axes.legend(
+        handles=[mpatches.Patch(color=colormap[dim], label=str(dim)) for dim in dimensions],
+        loc="best",
+    )
 
-#         try:
-#             persistence, nx2_array = _array_handler(persistence)
-#             persistence = _limit_to_max_intervals(
-#                 persistence, max_intervals, key=lambda life_time: life_time[1][1] - life_time[1][0]
-#             )
-#             (min_birth, max_death) = __min_birth_max_death(persistence)
-#             persistence = sorted(persistence, key=lambda life_time: life_time[1][1] - life_time[1][0])
-#             persistence = sorted(persistence, key=lambda birth: birth[1][0])
-#         except IndexError:
-#             min_birth, max_death = 0.0, 1.0
-#             pass
+    axes.set_title("Persistence barcode", fontsize=fontsize)
+    axes.set_yticks([])
 
-#         delta = (max_death - min_birth) * inf_delta
-#         # Replace infinity values with max_death + delta for bar code to be more
-#         # readable
-#         if infinity is None:
-#             infinity = max_death + delta
-#         if axis_start is None:
-#             axis_start = min_birth - delta
+    if len(x) != 0:
+        axes.set_xlim((axis_start, infinity))
 
-#         if axes is None:
-#             _, axes = plt.subplots(1, 1)
-#         if colormap is None:
-#             colormap = plt.cm.Set1.colors
+    # -------------------------------- 
+    # the next part fixes the scaling 
+    margin = 0.4
+    n_bars = len(barcode)
+    padding = 1.5
 
-#         x = [birth for (dim, (birth, death)) in persistence]
-#         y = [(death - birth) if death != float("inf") else (infinity - birth) for (dim, (birth, death)) in persistence]
-#         c = [colormap[dim] for (dim, (birth, death)) in persistence]
+    fig = axes.get_figure()
+    axes.set_ylim([-padding, (n_bars-1) + padding])
+    fig_height = n_bars * (bar_height + margin)# + padding
+    axes.invert_yaxis() # temp changing this
+    
+    fig.set_figheight(fig_height)
 
-#         if bar_height is None:
-#             bar_height = 0.6
-     
-#         axes.barh(range(len(x)), y, left=x, alpha=alpha, color=c, linewidth=0, height=bar_height)
+    width_inches = 10
+    height_inches = n_bars * margin + padding
+    fig.set_size_inches(width_inches, height_inches)
+    fig.subplots_adjust(top=1)
+    # --------------------------------          
 
-#         if legend is None and not nx2_array:
-#             # By default, if persistence is an array of (dimension, (birth, death)), display the legend
-#             legend = True
-
-#         if legend:
-#             dimensions = {item[0] for item in persistence}
-#             axes.legend(
-#                 handles=[mpatches.Patch(color=colormap[dim], label=str(dim)) for dim in dimensions],
-#                 loc="best",
-#             )
-
-#         axes.set_title("Persistence barcode", fontsize=fontsize)
-#         axes.set_yticks([])
-
-#         # -------------------------------- 
-#         # the next part fixes the scaling 
-#         margin = 0.4
-#         n_bars = len(persistence)
-#         padding = 1.5
-
-
-#         fig = axes.get_figure()
-#         axes.set_ylim([-padding, (n_bars-1) + padding])
-#         fig_height = n_bars * (bar_height + margin)# + padding
-#         axes.invert_yaxis() # temp changing this
-        
-#         fig.set_figheight(fig_height)
-
-#         width_inches = 10
-#         height_inches = n_bars * margin + padding
-#         fig.set_size_inches(width_inches, height_inches)
-#         # fig.subplots_adjust(top=0.85)
-#         fig.subplots_adjust(top=1)
-#         # --------------------------------          
-
-
-#         # Ends plot on infinity value and starts a little bit before min_birth
-#         if len(x) != 0:
-#             axes.set_xlim((axis_start, infinity))
-#         return axes
+    return axes
 

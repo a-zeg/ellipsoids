@@ -1,17 +1,22 @@
 import numpy as np
 import math
+import gudhi as gd
+import matplotlib.pyplot as plt
+import time
+import os
+import sys
+
 from scipy import sparse
 from sklearn.neighbors import KDTree
 from sklearn.metrics.pairwise import euclidean_distances
-import gudhi as gd
 from gudhi.weighted_rips_complex import WeightedRipsComplex
 from gudhi.dtm_rips_complex import DTMRipsComplex
 from ripser import ripser
-import matplotlib.pyplot as plt
-import time
 
-import data_construction
-import plots
+sys.path.append(os.path.abspath('.'))
+
+import ellipsoids.turkevs.data_construction as data_construction
+import ellipsoids.turkevs.plots as plots
 
 
 

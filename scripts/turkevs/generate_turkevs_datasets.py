@@ -1,15 +1,21 @@
-# from  import get_paths_of_files_in_a_folder
-import data_handling
 import numpy as np
-import pickle
-import data_construction
-import re
 import os
+import sys
+import re
+
+sys.path.append(os.path.abspath('.'))
+
+from ellipsoids.data_handling import save_variables
+from ellipsoids.data_handling import get_paths_of_files_in_a_folder
+from ellipsoids.turkevs.data_construction import build_dataset_holes
+from ellipsoids.turkevs.data_construction import calculate_point_clouds_under_trnsf
+
+
 
 def generate_turkevs_datasets(N: int, n: int, filename: str, seed: int, save_to_file=True):
     '''
     Generate datasets for Turkevs experiments (the original point clouds +
-    transformed point clouds) and save them as pkl files.
+    transformed point clouds) and save them as json files.
 
     Parameters
         ----------
@@ -27,17 +33,14 @@ def generate_turkevs_datasets(N: int, n: int, filename: str, seed: int, save_to_
 
     np.random.seed(seed)
 
-    # if not filename.endswith('.pkl'):
-    #     filename = filename + '.pkl'
-
     print("\n\nConstructing the data...")
-    data_pc, labels, _ = data_construction.build_dataset_holes(N, n)
-    data_pc_trns = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "translation")
-    data_pc_rot = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "rotation")
-    data_pc_stretch = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "stretch")
-    data_pc_shear = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "shear")
-    data_pc_gauss = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "gaussian")
-    data_pc_out = data_construction.calculate_point_clouds_under_trnsf(data_pc, transformation = "outliers")
+    data_pc, labels, _ = build_dataset_holes(N, n)
+    data_pc_trns = calculate_point_clouds_under_trnsf(data_pc, transformation = "translation")
+    data_pc_rot = calculate_point_clouds_under_trnsf(data_pc, transformation = "rotation")
+    data_pc_stretch = calculate_point_clouds_under_trnsf(data_pc, transformation = "stretch")
+    data_pc_shear = calculate_point_clouds_under_trnsf(data_pc, transformation = "shear")
+    data_pc_gauss = calculate_point_clouds_under_trnsf(data_pc, transformation = "gaussian")
+    data_pc_out = calculate_point_clouds_under_trnsf(data_pc, transformation = "outliers")
     data_pc_trnsfs = {}
     data_pc_trnsfs["std"] = data_pc
     data_pc_trnsfs["trns"] = data_pc_trns
@@ -51,23 +54,21 @@ def generate_turkevs_datasets(N: int, n: int, filename: str, seed: int, save_to_
     data_pc_trnsfs['labels'] = labels
 
     if save_to_file is True:
-        data_handling.save_variables(data_pc_trnsfs, filename=filename, timestamp=False)
-
+        save_variables(data_pc_trnsfs, filename=filename, timestamp=False)
 
     return data_pc_trnsfs
 
-    # with open(filename, "wb") as f:
-    #     pickle.dump(data_pc_trnsfs, f)
+
 
 def generate_id(folder):
     '''
-    The datasets used in the Turkevs holes tests are generated using the code from the paper and saved in a pkl file.
-    To keep track of which datasets correspond to which data / graphs, 'id' was introduced.
+    The datasets used in the Turkevs holes tests are generated using the code from the paper and saved in a json file.
+    To keep track of which datasets correspond to which data / graphs, 'id' is introduced.
 
-    This function checks the ids of all the pkl files in the given folder and returns the next available one.
+    This function checks the ids of all the dataset files in the given folder and returns the next available one.
     '''
-    pathspkl = data_handling.get_paths_of_files_in_a_folder(folder, extension='pkl')
-    pathsjson = data_handling.get_paths_of_files_in_a_folder(folder, extension='json')
+    pathspkl = get_paths_of_files_in_a_folder(folder, extension='pkl')
+    pathsjson = get_paths_of_files_in_a_folder(folder, extension='json')
     paths = pathspkl + pathsjson
 
     id = 0

@@ -16,8 +16,11 @@ import numpy as np
 import math
 import pickle
 import collections
-from scipy.spatial import ConvexHull
 import alphashape
+import os
+import sys
+
+from scipy.spatial import ConvexHull
 from descartes import PolygonPatch
 from shapely.geometry import Point 
 from matplotlib.path import Path
@@ -33,8 +36,9 @@ from skimage.util import invert
 from matplotlib import image
 import matplotlib.pyplot as plt
 
-# import ph # temp, to inspect flavia dataset, will be removed later
-import plots
+sys.path.append(os.path.abspath('.'))
+
+import ellipsoids.turkevs.plots as plots
 
 
 

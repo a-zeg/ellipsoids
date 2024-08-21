@@ -9,6 +9,7 @@ from ellipsoids.data_handling import generate_filename
 from ellipsoids.data_handling import extract_barcodes_in_dim0_and_dim1
 from ellipsoids.data_handling import set_filename_parameters
 from ellipsoids.data_handling import filter_dictionary
+from ellipsoids.data_handling import get_paths_with_seed
 
 
 def test_json_process_variables():
@@ -185,6 +186,24 @@ def test_filter_dictionary():
 
     assert target_filtered_dictionary == filtered_dictionary
 
+
+def test_get_paths_with_seed():
+
+    paths = ['datasets/pentagons/pentagonsamplesSmall2.mat_nPts=100_seed=0.mat',
+             'datasets/pentagons/pentagonsamplesSmall2.mat_nPts=100_seed=1.mat',
+             'datasets/pentagons/pentagonsamplesSmall2.mat_nPts=100_seed=2.mat',
+             'datasets/pentagons/pentagonsamplesSmall2.mat_nPts=300_seed=0.mat',
+             'datasets/pentagons/pentagonsamplesSmall2.mat_nPts=300_seed=1.mat',
+             'datasets/pentagons/pentagonsamplesSmall2.mat_nPts=300_seed=2.mat']
+
+    seed = 1
+    target_paths = ['datasets/pentagons/pentagonsamplesSmall2.mat_nPts=100_seed=1.mat',
+                    'datasets/pentagons/pentagonsamplesSmall2.mat_nPts=300_seed=1.mat']
+    
+    output_paths = get_paths_with_seed(paths, seed)
+    print(output_paths)
+
+    assert set(target_paths) == set(get_paths_with_seed(paths, seed))
 
 
 # def test_read_pd0_and_pd1():

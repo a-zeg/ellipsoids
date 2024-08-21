@@ -16,19 +16,24 @@ print("\n\nNUMBER OF HOLES: Point clouds ordinal classification via persistent h
 
 import numpy as np
 import os
+import sys
+
 import matplotlib.pyplot as plt
 
-import data_construction as data_construction
-import ph as ph
-import model as model
-import ml as ml
-import ph_ml as ph_ml
-import nn_shallow as nn_shallow
-import nn_deep as nn_deep
-import point_net as point_net
-import plots as plots
+sys.path.append(os.path.abspath('.'))
 
-import data_handling
+import ellipsoids.turkevs.data_construction as data_construction
+import ellipsoids.turkevs.ph as ph
+import ellipsoids.turkevs.model as model
+import ellipsoids.turkevs.ml as ml
+import ellipsoids.turkevs.ph_ml as ph_ml
+import ellipsoids.turkevs.nn_shallow as nn_shallow
+import ellipsoids.turkevs.nn_deep as nn_deep
+import ellipsoids.turkevs.point_net as point_net
+import ellipsoids.turkevs.plots as plots
+
+import ellipsoids.data_handling as data_handling
+
 
 
 def get_points_and_labels_from_dict(points_dict_of_lists):
@@ -68,6 +73,8 @@ def get_points_and_labels_from_dict(points_dict_of_lists):
 
     return data_pc_trnsfs, labels
 
+
+
 def calculate_accuracy_trnsfs(ml_module, data_train, labels_train, data_test_trnsfs, labels_test, TRAIN_SIZES, results_path='', name=''):
 
     if name != '':
@@ -79,16 +86,6 @@ def calculate_accuracy_trnsfs(ml_module, data_train, labels_train, data_test_trn
     print("\n\nTraining...")
     model_trained, _ = model.fit(data_train, labels_train, model_) 
 
-    # # debugging
-    # debug_dict = {}
-    # debug_dict['data_test_trnsfs_std'] = data_test_trnsfs['std']
-    # debug_dict['labels_test'] = labels_test
-    # data_handling.saveVarsToFile(debug_dict, 'debug_dict')
-    # print("\n\nCalculating accuracy...")
-    # acc = model.get_score(data_test_trnsfs['std'], labels_test, model_trained) # new
-    # print(name + ' accuracy is ', acc) # new
-    # ###################
-
     print("\n\nEvaluating the noise robustness...")
     trnsfs = ["std", "trns", "rot", "stretch", "shear", "gauss", "out"]
 
@@ -97,6 +94,8 @@ def calculate_accuracy_trnsfs(ml_module, data_train, labels_train, data_test_trn
                                                 labels_test, 
                                                 model_trained)
     return accs_trnsfs
+
+
 
 def select_dict_data(data, indices):
     '''
@@ -111,6 +110,8 @@ def select_dict_data(data, indices):
         filtered_data[transformation] = [data_transformation[i] for i in indices]
 
     return filtered_data
+
+
 
 def run_experiments(json_data_folder, results_path):
      
@@ -205,29 +206,29 @@ def run_experiments(json_data_folder, results_path):
     pipelines.append('PH simple')
 
     # # [comment the next three blocks for speed]
-    # # Distance matrices.
-    # print("\n\nCalculating distance matrices (input for ML and NN)...")
-    # data_dis_mat_flat = data_construction.calculate_distance_matrices_flat(data_pc)
-    # data_dis_mat_flat_train = data_dis_mat_flat[train_indices]
-    # data_dis_mat_flat_test_trnsfs = data_construction.calculate_distance_matrices_flat_under_trnsfs(point_clouds_trnsfs=data_pc_test_trnsfs, trnsfs=trnsfs)
+    # Distance matrices.
+    print("\n\nCalculating distance matrices (input for ML and NN)...")
+    data_dis_mat_flat = data_construction.calculate_distance_matrices_flat(data_pc)
+    data_dis_mat_flat_train = data_dis_mat_flat[train_indices]
+    data_dis_mat_flat_test_trnsfs = data_construction.calculate_distance_matrices_flat_under_trnsfs(point_clouds_trnsfs=data_pc_test_trnsfs, trnsfs=trnsfs)
 
-    # # ML
-    # accs["ML"] = calculate_accuracy_trnsfs(ml, data_dis_mat_flat_train, labels_train, data_dis_mat_flat_test_trnsfs, labels_test, TRAIN_SIZES, results_path=results_path, name='ML')
-    # pipelines.append('ML')
-    # # NN shallow
-    # accs["NN shallow"] = calculate_accuracy_trnsfs(nn_shallow, data_dis_mat_flat_train, labels_con_train, data_dis_mat_flat_test_trnsfs, labels_con_test, TRAIN_SIZES, results_path=results_path, name='NN_shallow')
-    # pipelines.append('NN shallow')
-    # # NN deep
-    # accs["NN deep"] = calculate_accuracy_trnsfs(nn_deep, data_dis_mat_flat_train, labels_con_train, data_dis_mat_flat_test_trnsfs, labels_con_test, TRAIN_SIZES, results_path=results_path, name='NN_deep')
-    # pipelines.append('NN deep')
+    # ML
+    accs["ML"] = calculate_accuracy_trnsfs(ml, data_dis_mat_flat_train, labels_train, data_dis_mat_flat_test_trnsfs, labels_test, TRAIN_SIZES, results_path=results_path, name='ML')
+    pipelines.append('ML')
+    # NN shallow
+    accs["NN shallow"] = calculate_accuracy_trnsfs(nn_shallow, data_dis_mat_flat_train, labels_con_train, data_dis_mat_flat_test_trnsfs, labels_con_test, TRAIN_SIZES, results_path=results_path, name='NN_shallow')
+    pipelines.append('NN shallow')
+    # NN deep
+    accs["NN deep"] = calculate_accuracy_trnsfs(nn_deep, data_dis_mat_flat_train, labels_con_train, data_dis_mat_flat_test_trnsfs, labels_con_test, TRAIN_SIZES, results_path=results_path, name='NN_deep')
+    pipelines.append('NN deep')
 
-    # # PointNet (need 3D point clouds and labels_con_test)
-    # print("\n\nCalculating 3D point clouds (input for PointNet)...")
-    # data_pc_3d = data_construction.calculate_3d_point_clouds(data_pc)
-    # data_pc_3d_train = data_pc_3d[train_indices] 
-    # data_pc_3d_test_trnsfs = data_construction.calculate_3d_point_clouds_under_trnsfs(point_clouds_trnsfs = data_pc_test_trnsfs, trnsfs = trnsfs)
-    # accs["PointNet"] = calculate_accuracy_trnsfs(point_net, data_pc_3d_train, labels_con_train, data_pc_3d_test_trnsfs, labels_con_test, TRAIN_SIZES, results_path=results_path, name='PointNet')
-    # pipelines.append('PointNet')
+    # PointNet (need 3D point clouds and labels_con_test)
+    print("\n\nCalculating 3D point clouds (input for PointNet)...")
+    data_pc_3d = data_construction.calculate_3d_point_clouds(data_pc)
+    data_pc_3d_train = data_pc_3d[train_indices] 
+    data_pc_3d_test_trnsfs = data_construction.calculate_3d_point_clouds_under_trnsfs(point_clouds_trnsfs = data_pc_test_trnsfs, trnsfs = trnsfs)
+    accs["PointNet"] = calculate_accuracy_trnsfs(point_net, data_pc_3d_train, labels_con_train, data_pc_3d_test_trnsfs, labels_con_test, TRAIN_SIZES, results_path=results_path, name='PointNet')
+    pipelines.append('PointNet')
 
     vars_to_save['accs'] = accs
 
@@ -239,6 +240,7 @@ def run_experiments(json_data_folder, results_path):
     transformations = ["original", "translation", "rotation", "stretch", "shear", "gaussian", "outliers"]
     fig = plots.plot_bar_chart(transformations, accs, pipelines)
     plt.savefig(os.path.join(path_results, "accs_trnsfs_" + unique_id), bbox_inches = "tight")
+
 
 
 if __name__ == '__main__':

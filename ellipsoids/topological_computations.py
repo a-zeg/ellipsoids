@@ -1,9 +1,10 @@
-import numpy as np
-import gudhi as gd
 import json
 import os
 import time
 
+import numba
+import numpy as np
+import gudhi as gd
 from sklearn.decomposition import PCA
 from sklearn.neighbors import KDTree
 from scipy import spatial
@@ -45,7 +46,7 @@ class Ellipsoid:
             sort_keys=True, indent=4)
 
 
-def fitEllipsoid(center: list, nbhd_pts: np.array, axesRatios: np.array):
+def fitEllipsoid(center: list, nbhd_pts: np.array, axesRatios: np.array) -> Ellipsoid:
     ''' Use PCA to fit an ellipsoid to the given neighbourhood
     :return: ellipsoid of dimension dim with axes obtained from PCA
     '''
@@ -62,7 +63,8 @@ def fitEllipsoid(center: list, nbhd_pts: np.array, axesRatios: np.array):
     return Ellipsoid(center, axes, axesLengths)
 
 
-def fitEllipsoids(points, neighbourhoodSize, axesRatios):
+
+def fitEllipsoids(points, neighbourhoodSize, axesRatios) -> list[Ellipsoid]:
     print('Creating KD tree... ', end='', flush=True)
     kdTree = spatial.KDTree(points)
     print('Done.')
@@ -80,6 +82,8 @@ def fitEllipsoids(points, neighbourhoodSize, axesRatios):
     print('Done.')
 
     return ellipsoidList
+
+
 
 def ellipsoidIntersection(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, r):
     ''' Checks whether ellipsoid1 and ellipsoid2 at the filtration level r intersect.
@@ -109,10 +113,13 @@ def ellipsoidIntersection(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, r):
                           args=(lambdas, v_squared, r))
     return (res.fun >= 0)
 
+
+
 def K(s, lambdas, v_squared, r):
     ''' Auxiliary function needed in ellipsoidIntersection
     '''
     return 1.-(1./r**2)*np.sum(v_squared*((s*(1.-s))/(1.+s*(lambdas-1.))))
+
 
 
 def get_max_axes_ratio(ellipsoid: Ellipsoid):
@@ -121,7 +128,10 @@ def get_max_axes_ratio(ellipsoid: Ellipsoid):
 
     return max_axis_length / min_axis_length
 
-def findIntersectionRadius(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, threshold=0.001, epsilon=0.001, *kwargs):
+
+
+def findIntersectionRadius(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, threshold=0.001, epsilon=0.001):
+# def findIntersectionRadius(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, threshold=0.001, epsilon=0.001, *kwargs):
 
     dist = np.linalg.norm(ellipsoid1.center - ellipsoid2.center)
     
@@ -142,6 +152,7 @@ def findIntersectionRadius(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, thresho
             return 2*r # 2r so that it's comparable to Rips
         else: r = (minIntersectionFiltration + maxNonIntersectionFiltration)/2
 
+
     
 def generateEllipsoidSimplexTree3(points, nbhdSize, axesRatios):
     ''' list comprehesion '''
@@ -159,6 +170,8 @@ def generateEllipsoidSimplexTree3(points, nbhdSize, axesRatios):
     print('Done.')
 
     return [simplexTree, ellipsoidList]
+
+
 
 def generateEllipsoidSimplexTree4(points, nbhdSize, axesRatios):
     ''' multiprocessing '''
@@ -190,6 +203,37 @@ def generateEllipsoidSimplexTree4(points, nbhdSize, axesRatios):
         radii = list(p.starmap(findIntersectionRadius, tasks))
 
     [simplexTree.insert(pair,r) for pair, r in zip(pairs,radii)]
+
+    print('Done.')
+    return [simplexTree, ellipsoidList]
+
+
+
+
+def generateEllipsoidSimplexTree4_new(points, nbhdSize, axesRatios):
+    ''' multiprocessing '''
+    ''' Creates a simplex tree from the ellipsoids by adding an edge between each two points whose 
+    corresponding ellipsoids intersect.
+    :kdTree: KD tree of the initial dataset
+    :ellipsoidList: list of ellipsoids (output of ??)
+    :queryRadius:
+    :filtrationValues:
+
+    :return: gudhi.SimplexTree
+    '''
+
+    ellipsoidList: list[Ellipsoid] = fitEllipsoids(points, nbhdSize, axesRatios)
+
+    print('Calculating ellipsoid simplex tree... ', end='', flush=True)
+
+    simplexTree = gd.SimplexTree()
+    [simplexTree.insert([i],0) for i in np.arange(len(points))] #TODO check if the whole array can be assigned
+    
+    for i, ellipsoid1 in enumerate(ellipsoidList):
+        for j, ellipsoid2 in enumerate(ellipsoidList[i:]):
+            intersection_radius = findIntersectionRadius(ellipsoid1, ellipsoid2)
+            simplexTree.insert([i, j+i], intersection_radius)
+
 
     print('Done.')
     return [simplexTree, ellipsoidList]

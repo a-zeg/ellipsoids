@@ -6,7 +6,7 @@ from datetime import datetime
 
 
 
-from ellipsoids.visualisation.visualisation import visualisationFromFile
+from ellipsoids.visualisation import visualisationFromFile
 from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode
 from ellipsoids.topological_computations import reduceBarcode
 from ellipsoids.data_handling import read_variables
