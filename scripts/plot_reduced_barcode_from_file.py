@@ -1,13 +1,13 @@
 import os
 import sys
-import matplotlib.pyplot as plt
 
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 
+sys.path.append(os.path.abspath('.'))
 
-from ellipsoids.visualisation import visualisationFromFile
-from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode
+from ellipsoids.visualisation import plot_barcode
 from ellipsoids.topological_computations import reduceBarcode
 from ellipsoids.data_handling import read_variables
 
@@ -54,8 +54,8 @@ fig, axes = plt.subplots()
 # fig.set_size_inches(10,2)
 # axes.set_ylim([-1,10])
 
-plot_persistence_barcode(barcodeRips, inf_delta=0.5, axes=axes, fontsize=12,\
-                                        axis_start = -0.1, infinity = xAxisEnd, max_intervals=100) 
+plot_barcode(barcodeRips, inf_delta=0.5, axes=axes, fontsize=12,\
+            axis_start = -0.1, infinity = xAxisEnd, max_intervals=100) 
 
 plt.show()
 

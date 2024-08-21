@@ -13,8 +13,6 @@ from ellipsoids.topological_computations import reduceBarcode
 from ellipsoids.data_handling import set_filename_parameters
 from ellipsoids.data_handling import generate_filename
 from ellipsoids.data_handling import figure_eight
-from ellipsoids.data_handling import sample_from_circle
-from ellipsoids.data_handling import sample_from_sphere
 from ellipsoids.data_handling import save_variables
 from ellipsoids.data_handling import read_variables
 from ellipsoids.visualisation import plotEllipses
@@ -23,52 +21,36 @@ from ellipsoids.visualisation import plotCircles
 from ellipsoids.visualisation import plot_barcode
 
 
-def calculate_ellipsoid_complex(data_type: str):
+def calculate_ellipsoid_and_rips_complexes():
     random.seed(10)
 
-    output_folder='data/for_paper'
-    n = 50
-
-    if data_type == 'figure_eight':
-        a = 2
-        b = 0.5
-        points = figure_eight(n,a,b,variation=0.05)
-    elif data_type == 'circle':
-        points = sample_from_circle(n_pts=n)
-    elif data_type == 'sphere':
-        points = sample_from_sphere(n_pts=n)
-
-    data_type_params={}
-    n_pts = len(points)
-    ambient_dim = len(points[0])
-
-    if ambient_dim == 2:
-        axes_ratios_all = np.array([[3,1]])
-    elif ambient_dim == 3:
-        axes_ratios_all = np.array([[3,3,1]])
-
+    output_folder='data/'
+    n_pts = 50
+    axes_ratios = np.array([3,1])
     expansion_dim = 2
-    nbhd_sizes = [5]
+    nbhd_size = 5
+    data_type_params={}
+    data_type = 'figure_eight'
+    filename_parameters = set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
+    save_filename = generate_filename(filename_parameters, folder=output_folder)
 
-    for axes_ratios in axes_ratios_all:
+    points = figure_eight(n_pts, 2, 0.5, variation=0.05)
 
-        for nbhd_size in nbhd_sizes:
-            filename_parameters = set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
-            save_filename = generate_filename(filename_parameters, folder=output_folder)
+    barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, _ = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
+    barcode_rips, simplex_tree_rips, _ = calculate_rips_barcode(points, expansion_dim=expansion_dim)
 
-            barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, _ = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
-            barcode_rips, simplex_tree_rips, _ = calculate_rips_barcode(points, expansion_dim=expansion_dim)
+    dict_vars = {
+        'points' : points,
+        'barcode_ellipsoids' : barcode_ellipsoids,
+        'barcode_rips' : barcode_rips,
+        'simplex_tree_ellipsoids' : simplex_tree_ellipsoids,
+        'simplex_tree_rips' : simplex_tree_rips,
+        'ellipsoid_list' : ellipsoid_list
+    }
 
-            dict_vars = {
-                'points' : points,
-                'barcode_ellipsoids' : barcode_ellipsoids,
-                'barcode_rips' : barcode_rips,
-                'simplex_tree_ellipsoids' : simplex_tree_ellipsoids,
-                'simplex_tree_rips' : simplex_tree_rips,
-                'ellipsoid_list' : ellipsoid_list
-            }
+    filename = save_variables(dict_vars, save_filename, timestamp=True)
 
-            save_variables(dict_vars, save_filename, timestamp=True)
+    return filename
 
 
 
@@ -140,10 +122,9 @@ def plot_from_file(filename, r_plot=0.2):
 
 if __name__ == '__main__':
     ## for calculation:
-    data_type = 'figure_eight'
-    # calculate_ellipsoid_complex(data_type)
+    filename = calculate_ellipsoid_and_rips_complexes()
 
     ## for plotting:
-    filename = 'data/for_paper/ellipsoids_data_type=figure_eight_n_pts=50_nbhd_size=5_axes_ratios=[3 1]__20240814_115936.json'
+    # filename = 'data/ellipsoids_data_type=circle_n_pts=20_nbhd_size=3_axes_ratios=[3 1]__20240821_164731.json'
     r_plot = 0.6
     plot_from_file(filename, r_plot=r_plot)

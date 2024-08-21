@@ -124,6 +124,7 @@ def figure_eight(n, a, b, variation=0):
 
 
 def sample_from_annulus(n, r, R, seed=None):
+    # taken from Bastian Rieck
     """Sample points from a 2D annulus.
 
     This function samples `N` points from an annulus with inner radius `r`
@@ -237,6 +238,8 @@ def save_variables(
     with open(filename, 'w') as outfile:
         outfile.write(json_string)
     print("Data saved to file " + filename + '.')
+
+    return filename
 
 
 

@@ -9,14 +9,20 @@ This script moves all json files in a given folder to folders with names
 
 
 import os
+import sys
 import shutil
-import data_handling
 import re
+
+sys.path.append(os.path.abspath('.'))
+
+from ellipsoids.data_handling import get_paths_of_files_in_a_folder
+
+
 
 source = "data/turkevs_20240520"
 
 print('Getting paths of .json files from ' + source, end='', flush=True)
-srcpaths = data_handling.get_paths_of_files_in_a_folder(source, '.json')
+srcpaths = get_paths_of_files_in_a_folder(source, '.json')
 print('Done.')
 
 

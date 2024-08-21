@@ -24,6 +24,7 @@ for path in paths:
 
             # Import points
             points = import_maxmin_mat(path=path)
+            data_type_params = {}
 
             # Generate the filename for storing the variables 
             n_pts = len(points)

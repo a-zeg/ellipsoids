@@ -1,7 +1,13 @@
-from visualisation import visualisationFromFile
-from datetime import datetime
+import os
 from os import listdir
 from os.path import isfile, join
+import sys
+
+sys.path.append(os.path.abspath('.'))
+
+from ellipsoids.visualisation import visualisationFromFile
+
+
 
 ###### User input ######
 filename = \

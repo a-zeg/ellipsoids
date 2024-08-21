@@ -4,12 +4,19 @@ calculates the accuriacies of the classification based on the ellipsoids persist
 as well as the other algorithms used in "On the effectiveness of persistent homology".
 '''
 
-
 import os
-import data_handling
-# from data_handling import find_subfolder_with_given_id
-import plots
+import sys
+
 import matplotlib.pyplot as plt
+
+sys.path.append(os.path.abspath('.'))
+
+from ellipsoids.data_handling import get_paths_of_files_in_a_folder
+from ellipsoids.data_handling import read_variables
+from ellipsoids.data_handling import save_variables
+from ellipsoids.data_handling import get_timestamp
+from ellipsoids.turkevs.plots import plot_bar_chart
+
 
 
 if __name__ == '__main__':
@@ -23,7 +30,7 @@ if __name__ == '__main__':
         exit('Error: folder ' + path_results + ' does not exist.')
 
 
-    paths = data_handling.get_paths_of_files_in_a_folder(path_results, '.json')
+    paths = get_paths_of_files_in_a_folder(path_results, '.json')
     paths = [path for path in paths if 'variables' in path]
     if len(paths) == 0:
         exit('Error: no valid paths found.')
@@ -34,7 +41,7 @@ if __name__ == '__main__':
 
     for path in paths:
         accs = {}
-        json_vars = data_handling.read_variables(path)
+        json_vars = read_variables(path)
         if 'accs' in json_vars:
             accs = json_vars['accs']
         else:
@@ -59,13 +66,13 @@ if __name__ == '__main__':
     vars_to_save['average_accs'] = average_accs
     vars_to_save['accs_file_paths'] = paths
 
-    unique_id = id + data_handling.get_timestamp()
+    unique_id = id + get_timestamp()
 
     filename_save_vars = os.path.join(path_results,'turkevs_average_' + unique_id)
-    data_handling.save_variables(vars_to_save, filename=filename_save_vars, timestamp=False)
+    save_variables(vars_to_save, filename=filename_save_vars, timestamp=False)
 
     transformations = ["original", "translation", "rotation", "stretch", "shear", "gaussian", "outliers"]
-    fig = plots.plot_bar_chart(transformations, average_accs, pipelines)
+    fig = plot_bar_chart(transformations, average_accs, pipelines)
     plt.savefig(os.path.join(path_results, "accs_trnsfs_averages_" + unique_id), bbox_inches = "tight")
 
 

@@ -7,3 +7,11 @@
 /euler
 /results
 /.venv
+__pycache__/
+.pytest_cache/
+/datasets/turkevs2022on-main/
+/datasets/meshes/
+/datasets/reconstruction.ply
+/datasets/turkevs/
+/datasets/turkevs_old_pkl/
+/unused/
