@@ -2,7 +2,6 @@ import json
 import os
 import time
 
-import numba
 import numpy as np
 import gudhi as gd
 from sklearn.decomposition import PCA
