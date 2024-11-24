@@ -39,8 +39,8 @@ def sample_from_circle(n_pts=100, variation=0.1, outlier=False):
 
 
 
-def sample_from_ellipse(n_pts=100, a=2, b=1, variation=0.1):
-    t = np.linspace(0, 2*np.pi * (n_pts-1)/n_pts, n_pts)
+def sample_from_ellipse(n_pts=100, a=2, b=1, variation=0.1, shift=0):
+    t = np.linspace(0, 2*np.pi * (n_pts-1)/n_pts, n_pts) + shift
     x = a * np.cos(t) + variation * np.random.rand(n_pts)
     y = b * np.sin(t) + variation * np.random.rand(n_pts)
     return np.vstack((x,y)).transpose()
@@ -219,6 +219,15 @@ class CustomEncoder(json.JSONEncoder):
         
         return json.JSONEncoder.default(self, obj)
 
+def ensure_folder_exists(filename):
+    """
+    Checks if the folder for the given filename exists,
+    and creates it if it does not.
+    """
+    folder = os.path.dirname(filename)
+
+    if folder and not os.path.exists(folder):
+        os.makedirs(folder)
 
 
 def save_variables(
@@ -233,6 +242,8 @@ def save_variables(
 
     if not filename.endswith('.json'):
         filename = filename + '.json'
+
+    ensure_folder_exists(filename);
 
     json_string = json.dumps(dictOfVars, cls=CustomEncoder, indent=4)
     with open(filename, 'w') as outfile:
