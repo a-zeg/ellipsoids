@@ -24,7 +24,7 @@ def test_json_process_variables():
         'nbhd_size' : 5,
         'nPts' : 10,
         'points' : [[0,0],[1,0]],
-        'ellipsoid_list' : [{'center': [0,0], 'axes': [[1,0],[0,1]], 'axesLengths': [1,0.5]}],
+        'ellipsoid_list' : [{'center': [0,0], 'axes': [[1,0],[0,1]], 'axes_lengths': [1,0.5]}],
         'simplex_tree_ellipsoids': 
             [
                 [ [0], 0.0 ],
@@ -62,7 +62,7 @@ def test_json_process_variables():
     processed_ellipsoid = processed_variables['ellipsoid_list'][0]
     assert np.array_equal(processed_ellipsoid.center, np.array([0,0]))
     assert np.array_equal(processed_ellipsoid.axes, np.array([[1,0],[0,1]]))
-    assert np.array_equal(processed_ellipsoid.axesLengths, np.array([1,0.5]))
+    assert np.array_equal(processed_ellipsoid.axes_lengths, np.array([1,0.5]))
     assert isinstance(processed_variables['simplex_tree_ellipsoids'], gd.SimplexTree)
     assert processed_variables['simplex_tree_ellipsoids'].is_empty() == False
     assert processed_variables['barcode_ellipsoids'][0] == [1, [0.5, 1]]

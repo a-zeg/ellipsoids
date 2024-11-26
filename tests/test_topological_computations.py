@@ -2,14 +2,16 @@ import numpy as np
 import gudhi as gd
 import copy
 
-from ellipsoids.topological_computations import fitEllipsoid
+from ellipsoids.topological_computations import fit_ellipsoid, spherisize_by_filtration
 from ellipsoids.topological_computations import generateEllipsoidSimplexTree4
 from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.topological_computations import findIntersectionRadius
 from ellipsoids.topological_computations import get_max_axes_ratio
-from ellipsoids.topological_computations import ellipsoidIntersection
+from ellipsoids.topological_computations import ellipsoid_intersection
 from ellipsoids.topological_computations import reduceBarcode
 from ellipsoids.topological_computations import padAxesRatios
+from ellipsoids.topological_computations import spherisize
+from ellipsoids.topological_computations import scale_to_01
 # from src.topological_computations import get_axes_ratios
 
 def test_fit_ellipsoid():
@@ -18,12 +20,12 @@ def test_fit_ellipsoid():
     neighbourhood = np.array([[-1,0],[0,0],[1,0]])
     axes_ratios = np.array([2,1])
 
-    fitted_ellipsoid = fitEllipsoid(center, neighbourhood, axesRatios = axes_ratios)
+    fitted_ellipsoid = fit_ellipsoid(center, neighbourhood, axes_ratios = axes_ratios)
 
     assert fitted_ellipsoid.center == center
     assert np.allclose(fitted_ellipsoid.axes[0], np.array([1,0]))
     assert np.allclose(fitted_ellipsoid.axes[1], np.array([0,1]))
-    assert np.allclose(fitted_ellipsoid.axesLengths, [1, 0.5])
+    assert np.allclose(fitted_ellipsoid.axes_lengths, [1, 0.5])
 
 
 def test_ellipsoid_intersection():
@@ -31,27 +33,27 @@ def test_ellipsoid_intersection():
     # nearby ellipsoids
     ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
     ellipsoid2 = Ellipsoid(np.array([0.1,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
-    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == True
+    assert ellipsoid_intersection(ellipsoid1, ellipsoid2, 1) == True
 
     # far apart ellipsoids
     ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
     ellipsoid2 = Ellipsoid(np.array([5,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
-    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == False
+    assert ellipsoid_intersection(ellipsoid1, ellipsoid2, 1) == False
 
     # ellipsoids that touch at one point (along the y-axis)
     ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,0.5]))
     ellipsoid2 = Ellipsoid(np.array([0,1]), np.array([[1,0],[0,1]]), np.array([1,0.5]))
-    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == True
+    assert ellipsoid_intersection(ellipsoid1, ellipsoid2, 1) == True
 
     # ellipsoids that touch at one point (along the x-axis)
     ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,0.5]))
     ellipsoid2 = Ellipsoid(np.array([2,0]), np.array([[1,0],[0,1]]), np.array([1,0.5]))
-    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == True
+    assert ellipsoid_intersection(ellipsoid1, ellipsoid2, 1) == True
 
     # ellipsoids that are the same
     ellipsoid1 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,1]))
     ellipsoid2 = Ellipsoid(np.array([0,0]), np.array([[1,0],[0,1]]), np.array([1,1]))    
-    assert ellipsoidIntersection(ellipsoid1, ellipsoid2, 1) == True
+    assert ellipsoid_intersection(ellipsoid1, ellipsoid2, 1) == True
 
 
 def test_find_intersection_radius():
@@ -231,15 +233,79 @@ def test_max_filtration():
     assert True
         
 
-def pad_axes_ratios():
+def test_pad_axes_ratios():
 
-    axes_ratios1 = np.array([3,1])
-    dim1 = 3
-    target_axes_ratios1 = np.arary([3,1,1])   
-    assert target_axes_ratios1 == padAxesRatios(axes_ratios1, dim1)
+    axes_ratios_1 = np.array([3,1])
+    dim_1 = 3
+    target_axes_ratios_1 = np.array([3,1,1])
+    assert np.array_equal(target_axes_ratios_1, padAxesRatios(axes_ratios_1, dim_1))
 
 
-    axes_ratios2 = np.array([3,1,1,1,1])
-    dim2 = 3
-    target_axes_ratios2 = np.arary([3,1,1])   
-    assert target_axes_ratios2 == padAxesRatios(axes_ratios2, dim2)
+    axes_ratios_2 = np.array([3,1,1,1,1])
+    dim_2 = 3
+    target_axes_ratios_2 = np.array([3,1,1])
+    assert np.array_equal(target_axes_ratios_2, padAxesRatios(axes_ratios_2, dim_2))
+
+
+
+def test_spherisize():
+
+    axes_lengths = np.array([3,2,1])
+
+    target_axes_lengths_1 = axes_lengths.astype(float)
+    s_1 = 0
+    target_axes_lengths_2 = np.array([3,3,3])
+    s_2 = 1
+    target_axes_lengths_3 = np.array([3,2.5,2])
+    s_3 = 0.5
+    axes_lengths_4 = np.array([1,0.5])
+    target_axes_lengths_4 = np.array([1,0.8])
+    s_4 = 0.6
+    axes_lengths_5 = np.array([5,2,2,1])
+    target_axes_lengths_5 = np.array([5, 3.2, 3.2, 2.6])
+    s_5 = 0.4
+
+    assert np.allclose(spherisize(axes_lengths, s_1), target_axes_lengths_1)
+    assert np.allclose(spherisize(axes_lengths, s_2), target_axes_lengths_2)
+    assert np.allclose(spherisize(axes_lengths, s_3), target_axes_lengths_3)
+    assert np.allclose(spherisize(axes_lengths_4, s_4), target_axes_lengths_4)
+    assert np.allclose(spherisize(axes_lengths_5, s_5), target_axes_lengths_5)
+
+
+
+def test_scale_to_01():
+
+    x1 = 2
+    min1=1
+    max1=3
+    target1 = 0.5
+
+    assert np.isclose(scale_to_01(x1,min1,max1), target1)
+
+
+
+def test_spherisize_by_filtration():
+
+    axes_lengths_1 = np.array([5,2,2,1])
+    spherisize_filtration_1 = 10
+    r_1_1 = 12
+    target_axes_lengths_1_1 = np.array([5,5,5,5])
+
+    r_1_2 = -1
+    target_axes_lengths_1_2 = axes_lengths_1
+
+    r_1_3 = 4
+    target_axes_lengths_1_3 = np.array([5, 3.2, 3.2, 2.6])
+
+    assert np.allclose(
+        spherisize_by_filtration(axes_lengths_1, r_1_1, spherisize_filtration=spherisize_filtration_1),
+        target_axes_lengths_1_1
+        )
+    assert np.allclose(
+        spherisize_by_filtration(axes_lengths_1, r_1_2, spherisize_filtration=spherisize_filtration_1),
+        target_axes_lengths_1_2
+        )
+    assert np.allclose(
+        spherisize_by_filtration(axes_lengths_1, r_1_3, spherisize_filtration=spherisize_filtration_1),
+        target_axes_lengths_1_3
+        )

@@ -15,8 +15,8 @@ from gudhi.persistence_graphical_tools import _limit_to_max_intervals, __min_bir
 def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     sampleRate = 100
     t = np.linspace(0, 2*np.pi, sampleRate)
-    xTemp = r*ellipse.axesLengths[0]*np.cos(t)
-    yTemp = r*ellipse.axesLengths[1]*np.sin(t)
+    xTemp = r*ellipse.axes_lengths[0]*np.cos(t)
+    yTemp = r*ellipse.axes_lengths[1]*np.sin(t)
     x = ellipse.center[0] + ellipse.axes[0,0]*xTemp + ellipse.axes[1,0]*yTemp
     y = ellipse.center[1] + ellipse.axes[0,1]*xTemp + ellipse.axes[1,1]*yTemp
     if axes is None:
@@ -28,9 +28,9 @@ def plotEllipsoid(ellipsoid: Ellipsoid, color='grey', r=1, axes=None):
     # see https://stackoverflow.com/questions/7819498/plotting-ellipsoid-with-matplotlib
     sampleRate = 100
 
-    rx = r * ellipsoid.axesLengths[0]
-    ry = r * ellipsoid.axesLengths[1]
-    rz = r * ellipsoid.axesLengths[2]
+    rx = r * ellipsoid.axes_lengths[0]
+    ry = r * ellipsoid.axes_lengths[1]
+    rz = r * ellipsoid.axes_lengths[2]
     
     # Set of all spherical angles:
     u = np.linspace(0, 2 * np.pi, sampleRate)

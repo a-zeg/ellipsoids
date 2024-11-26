@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import typing
 
 import numpy as np
 import gudhi as gd
@@ -15,95 +16,139 @@ from multiprocessing import cpu_count
 
 
 class Ellipsoid:
-    def __init__(self, center: np.array, axes: np.array, axesLengths: np.array):
+    def __init__(self, center: np.array, axes: np.array, axes_lengths: np.array):
         self.center = center
         self.axes = axes
-        self.axesLengths = axesLengths
+        self.axes_lengths = axes_lengths
 
     def __eq__(self, other):
         if isinstance(other, Ellipsoid):
             return (np.array_equal(self.center, other.center) and
                     np.array_equal(self.axes, other.axes) and
-                    np.array_equal(self.axesLengths, other.axesLengths))
+                    np.array_equal(self.axes_lengths, other.axes_lengths))
         return False
 
-    def toDict(self):
+    def to_dict(self): # renamed
         obj_data = {
                 "center": self.center,
                 "axes": self.axes.tolist(),
-                "axesLengths": self.axesLengths.tolist()
+                "axesLengths": self.axes_lengths.tolist()
             }
         return obj_data
     
-    def fromDict(self, obj_data: dict):
+    def from_dict(self, obj_data: dict): # renamed
         self.var1 = obj_data['var1']
         self.var2 = obj_data['var2']
         self.np_array = np.array(obj_data['np_array'])
 
-    def toJSON(self):
-        return json.dumps(self.toDict(), 
+    def to_JSON(self): # renamed
+        return json.dumps(self.to_dict(),
             sort_keys=True, indent=4)
 
 
-def fitEllipsoid(center: list, nbhd_pts: np.array, axesRatios: np.array) -> Ellipsoid:
+
+def fit_ellipsoid(center: list, nbhd_pts: np.array, axes_ratios: np.array) -> Ellipsoid:
     ''' Use PCA to fit an ellipsoid to the given neighbourhood
     :return: ellipsoid of dimension dim with axes obtained from PCA
     '''
     pca = PCA(n_components=len(center))
     pca.fit(nbhd_pts)
     axes = pca.components_
-    axesLengths = pca.singular_values_
+    axes_lengths = pca.singular_values_
 
-    if axesRatios.all() != 0:
-        axesLengths = axesRatios / axesRatios[0] # r determines the long axis (normalising the long axis to 1)
+    if axes_ratios.all() != 0:
+        axes_lengths = axes_ratios / axes_ratios[0] # r determines the long axis (normalising the long axis to 1)
         # axesLengths = axesRatios / axesRatios[-1] # alt: r determines the short axis
     else: 
         exit("Error: axes ratios contain a zero.")
-    return Ellipsoid(center, axes, axesLengths)
+    return Ellipsoid(center, axes, axes_lengths)
 
 
 
-def fitEllipsoids(points, neighbourhoodSize, axesRatios) -> list[Ellipsoid]:
+def fit_ellipsoids(points, neighbourhood_size, axes_ratios) -> list[Ellipsoid]:
     print('Creating KD tree... ', end='', flush=True)
     kdTree = spatial.KDTree(points)
     print('Done.')
     print('Fitting ellipsoids... ', end='', flush=True)
 
-    if len(points) < neighbourhoodSize:
+    if len(points) < neighbourhood_size:
         print('WARNING: the chosen neighbourhood size is too small. \
               Setting the neighbhourhood size to the total number of points.')
-        neighbourhoodSize = len(points)
+        neighbourhood_size = len(points)
 
-    _,neighbourhoodIdx = kdTree.query(points, neighbourhoodSize)
-    neighbourhoods = points[neighbourhoodIdx]
-    ellipsoidList \
-        = [fitEllipsoid(point, neighbourhood, axesRatios) for point,neighbourhood in zip(points, neighbourhoods)]
+    _,neighbourhood_idx = kdTree.query(points, neighbourhood_size)
+    neighbourhoods = points[neighbourhood_idx]
+    ellipsoid_list \
+        = [fit_ellipsoid(point, neighbourhood, axes_ratios) for point,neighbourhood in zip(points, neighbourhoods)]
     print('Done.')
 
-    return ellipsoidList
+    return ellipsoid_list
 
 
 
-def ellipsoidIntersection(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, r):
-    ''' Checks whether ellipsoid1 and ellipsoid2 at the filtration level r intersect.
+def spherisize(axes_lengths: np.array, s:float=1):
+    '''
+    Returns axes lengths of a "spherisized" ellipsoid.
+    For s=0, the function will output axes_lengths and for s=1 all elements of axes_lengths
+    will be equal to the longest one.
+
+    For example, for axes_ratios=np.array([3,2,1]), we get:
+    - s=0: np.array([3,2,1])
+    - s=0.5: np.array([3,2.5,2])
+    - s=1: np.array([3,3,3])
+    '''
+
+    major_axis = np.max(axes_lengths)
+    spherisized_axes_lengths = np.zeros(np.size(axes_lengths))
+    for idx, axis in enumerate(axes_lengths):
+        spherisized_axes_lengths[idx] = s*major_axis + (1-s)*axis
+    return spherisized_axes_lengths
+
+
+
+def scale_to_01(x: float, min: float = 0, max: float = 1):
+    '''
+    Scales the input x in the interval [min, max] to the interval [0,1]
+    If x is bigger than max, returns 1.
+    If x is smaller than min, returns 0.
+    '''
+    if x > max:
+        return 1
+    elif x < min:
+        return 0
+    else:
+        return (x-min)/(max-min)
+
+
+
+def spherisize_by_filtration(axes_lengths: np.array, r: float, spherisize_filtration: float = 10):
+    '''
+    At r=0 should have axes_ratio from the start.
+    At r=scale, should get balls.
+    '''
+
+    return spherisize(axes_lengths, scale_to_01(r,max=spherisize_filtration))
+
+
+
+def _ellipsoid_intersection(center_1: np.array, axes_lengths_1: np.array, axes_1: np.array,
+                            center_2: np.array, axes_lengths_2: np.array, axes_2: np.array,
+                            r: float):
+    ''' Checks whether two ellipsoids at filtration level r intersect.
     The method is from https://math.stackexchange.com/questions/1114879/detect-if-two-ellipses-intersect
     i.e. this paper: https://tisl.cs.toronto.edu/publication/201207-fusion-kalman_filter_fault_detection/fusion12-kalman_filter_fault_detection.pdf
     :return: true or false
     '''
-
-    if ellipsoid1 == ellipsoid2:
-        return True
-
     Sigma_A = np.linalg.multi_dot([\
-        np.transpose(ellipsoid1.axes),\
-        np.diag(ellipsoid1.axesLengths**2),\
-        ellipsoid1.axes])
+        np.transpose(axes_1),\
+        np.diag(axes_lengths_1**2),\
+        axes_1])
     Sigma_B = np.linalg.multi_dot([\
-        np.transpose(ellipsoid2.axes),\
-        np.diag(ellipsoid2.axesLengths**2),\
-        ellipsoid2.axes])
-    mu_A = ellipsoid1.center
-    mu_B = ellipsoid2.center
+        np.transpose(axes_2),\
+        np.diag(axes_lengths_2**2),\
+        axes_2])
+    mu_A = center_1
+    mu_B = center_2
 
     lambdas, Phi = eigh(Sigma_A, b=Sigma_B)
     v_squared = np.dot(Phi.T, mu_A - mu_B) ** 2
@@ -111,6 +156,30 @@ def ellipsoidIntersection(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, r):
                           bracket=[0.0, 0.5, 1.0],
                           args=(lambdas, v_squared, r))
     return (res.fun >= 0)
+
+
+
+def ellipsoid_intersection(ellipsoid_1: Ellipsoid, ellipsoid_2: Ellipsoid, r,
+                          spherisize_filtration: typing.Optional[float] = None):
+    ''' Checks whether ellipsoid_1 and ellipsoid_2 at the filtration level r intersect.
+    If spherisize_filtration is not None, then the axes_lengths will be adapted so that
+    for filtrations above spherisize_filtration, the ellipsoids become spheres
+    '''
+
+    if ellipsoid_1 == ellipsoid_2:
+        return True
+
+    axes_lengths_1 = ellipsoid_1.axes_lengths
+    axes_lengths_2 = ellipsoid_2.axes_lengths
+
+    if spherisize_filtration is not None:
+        axes_lengths_1 = spherisize_by_filtration(axes_lengths_1, r, spherisize_filtration)
+        axes_lengths_2 = spherisize_by_filtration(axes_lengths_2, r, spherisize_filtration)
+
+    return _ellipsoid_intersection(ellipsoid_1.center, axes_lengths_1, ellipsoid_1.axes,
+                                   ellipsoid_2.center, axes_lengths_2, ellipsoid_2.axes,
+                                   r)
+
 
 
 
@@ -122,8 +191,8 @@ def K(s, lambdas, v_squared, r):
 
 
 def get_max_axes_ratio(ellipsoid: Ellipsoid):
-    max_axis_length = max(ellipsoid.axesLengths)
-    min_axis_length = min(ellipsoid.axesLengths)
+    max_axis_length = max(ellipsoid.axes_lengths)
+    min_axis_length = min(ellipsoid.axes_lengths)
 
     return max_axis_length / min_axis_length
 
@@ -143,7 +212,7 @@ def findIntersectionRadius(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, thresho
     r = (minIntersectionFiltration - maxNonIntersectionFiltration)/2
 
     while True:
-        if ellipsoidIntersection(ellipsoid1, ellipsoid2, r):
+        if ellipsoid_intersection(ellipsoid1, ellipsoid2, r):
             minIntersectionFiltration = r
         else: maxNonIntersectionFiltration = r
 
@@ -156,7 +225,7 @@ def findIntersectionRadius(ellipsoid1: Ellipsoid, ellipsoid2: Ellipsoid, thresho
 def generateEllipsoidSimplexTree3(points, nbhdSize, axesRatios):
     ''' list comprehesion '''
 
-    ellipsoidList = fitEllipsoids(points, nbhdSize, axesRatios)
+    ellipsoidList = fit_ellipsoids(points, nbhdSize, axesRatios)
 
     print('Calculating ellipsoid simplex tree... ', end='', flush=True)
 
@@ -184,7 +253,7 @@ def generateEllipsoidSimplexTree4(points, nbhdSize, axesRatios):
     :return: gudhi.SimplexTree
     '''
 
-    ellipsoidList = fitEllipsoids(points, nbhdSize, axesRatios)
+    ellipsoidList = fit_ellipsoids(points, nbhdSize, axesRatios)
 
     print('Calculating ellipsoid simplex tree... ', end='', flush=True)
 
@@ -221,7 +290,7 @@ def generateEllipsoidSimplexTree4_new(points, nbhdSize, axesRatios):
     :return: gudhi.SimplexTree
     '''
 
-    ellipsoidList: list[Ellipsoid] = fitEllipsoids(points, nbhdSize, axesRatios)
+    ellipsoidList: list[Ellipsoid] = fit_ellipsoids(points, nbhdSize, axesRatios)
 
     print('Calculating ellipsoid simplex tree... ', end='', flush=True)
 
@@ -384,6 +453,8 @@ def calculate_ellipsoid_barcode(points: np.array, nbhd_size: int, axes_ratios: n
     total_time = t1_barcode - t0_barcode + t1_simplex_tree - t0_simplex_tree
 
     return barcode, simplex_tree, ellipsoid_list, total_time
+
+
 
 def calculate_rips_barcode(points: np.array, expansion_dim=2, collapse_edges=True):
 

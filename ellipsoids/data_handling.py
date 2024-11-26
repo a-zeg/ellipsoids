@@ -207,7 +207,7 @@ class CustomEncoder(json.JSONEncoder):
             obj_data = {
                 "center": obj.center,
                 "axes": obj.axes.tolist(),
-                "axesLengths": obj.axesLengths.tolist()
+                "axes_lengths": obj.axes_lengths.tolist()
             }
             return obj_data
         
@@ -280,11 +280,6 @@ def continuously_save_variables(
 
 
 
-def read_variable_from_dict(var_name, dictionary):
-   if var_name in dictionary:
-        vars[var_name] = dictionary[var_name] 
-
-
 
 def read_variables(filename):
     with open(filename, "r") as f:
@@ -298,8 +293,13 @@ def _json_process_ellipsoid_list(ellipsoid_list_raw):
 
     ellipsoidList = []
     for ellipsoid in ellipsoid_list_raw:
-        ellipsoidList.append(Ellipsoid(ellipsoid['center'], np.asarray(ellipsoid['axes']), \
-                                    np.asarray(ellipsoid['axesLengths'])))
+        for name in ['axes_lengths', 'axesLengths']:
+            if name in ellipsoid:
+                ellipsoidList.append(
+                    Ellipsoid(ellipsoid['center'],
+                              np.asarray(ellipsoid['axes']), \
+                              np.asarray(ellipsoid[name]))
+                    )
     
     return ellipsoidList
 
