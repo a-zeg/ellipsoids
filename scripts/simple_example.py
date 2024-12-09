@@ -15,8 +15,8 @@ from ellipsoids.data_handling import generate_filename
 from ellipsoids.data_handling import figure_eight
 from ellipsoids.data_handling import save_variables
 from ellipsoids.data_handling import read_variables
-from ellipsoids.visualisation import plotEllipses
-from ellipsoids.visualisation import plotSimplexTree
+from ellipsoids.visualisation import plot_ellipses
+from ellipsoids.visualisation import plot_simplex_tree
 from ellipsoids.visualisation import plotCircles 
 from ellipsoids.visualisation import plot_barcode
 
@@ -75,8 +75,8 @@ def plot_from_file(filename, r_plot=0.2):
     ax_pts = fig.add_subplot(221)
     ax_ptsR = fig.add_subplot(223)
 
-    plotEllipses(ellipseList=ellipsoid_list, r=r_plot, axes=ax_pts)
-    plotSimplexTree(points=points,simplexTree=simplex_tree_ellipsoids,r=r_plot,axes=ax_pts)
+    plot_ellipses(ellipse_list=ellipsoid_list, r=r_plot, axes=ax_pts)
+    plot_simplex_tree(points=points,simplexTree=simplex_tree_ellipsoids,r=r_plot,axes=ax_pts)
     ax_pts.set_aspect('equal', adjustable='box')
     n_pts = len(points)
     axes_ratio = ellipsoid_list[0].axesLengths / ellipsoid_list[0].axesLengths[-1]
@@ -87,7 +87,7 @@ def plot_from_file(filename, r_plot=0.2):
     ax_pts.set_title(f'{n_pts} points, ' + r'$q$=' + f'{q}, ' + r'$\varepsilon$' + f'={r_plot}')
 
     plotCircles(points=points, r=r_plot, axes=ax_ptsR)
-    plotSimplexTree(points=points,simplexTree=simplex_tree_rips,r=r_plot,axes=ax_ptsR)
+    plot_simplex_tree(points=points,simplexTree=simplex_tree_rips,r=r_plot,axes=ax_ptsR)
     ax_ptsR.set_aspect('equal', adjustable='box')
     ax_ptsR.set_title(f'{n_pts} points, ' + r'$r=$' + f'{r_plot}')
 

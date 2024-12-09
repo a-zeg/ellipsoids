@@ -5,6 +5,8 @@ import sys
 import json
 import re
 from datetime import datetime
+from dataclasses import dataclass
+from enum import Enum
 
 import pickle
 import gudhi as gd
@@ -15,14 +17,26 @@ from scipy.io import savemat
 
 sys.path.append(os.path.abspath('.'))
 
-from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.topological_computations import calculate_ellipsoid_barcode
 from ellipsoids.topological_computations import calculate_rips_barcode
 from ellipsoids.topological_computations import expandTreeAndCalculateBarcode
 
 
+from ellipsoids.common import Ellipsoid
+from ellipsoids.common import Dataset
+from ellipsoids.common import EllipsoidParameters
+from ellipsoids.common import ComplexType
+from ellipsoids.common import Results
 
-def sample_from_circle(n_pts=100, variation=0.1, outlier=False):
+
+def axes_lengths_to_int_ratio(axes_lengths: np.ndarray):
+    ''' Converts axes lengths to an integer "ratio", e.g. [1,0.5,0.2] becomes 1/0.2 = 5'''
+
+    q = axes_lengths / axes_lengths[-1]
+    return q.astype(int)
+
+
+def sample_from_circle(n_pts: int = 100, variation: float = 0.1, outlier: bool = False):
     if outlier is True: 
         n_pts = n_pts - 1
 
@@ -39,7 +53,8 @@ def sample_from_circle(n_pts=100, variation=0.1, outlier=False):
 
 
 
-def sample_from_ellipse(n_pts=100, a=2, b=1, variation=0.1, shift=0):
+def sample_from_ellipse(n_pts: int = 100, a: float = 2, b: float = 1,
+                        variation: float = 0.1, shift: float = 0):
     t = np.linspace(0, 2*np.pi * (n_pts-1)/n_pts, n_pts) + shift
     x = a * np.cos(t) + variation * np.random.rand(n_pts)
     y = b * np.sin(t) + variation * np.random.rand(n_pts)
@@ -47,7 +62,7 @@ def sample_from_ellipse(n_pts=100, a=2, b=1, variation=0.1, shift=0):
 
 
 
-def sample_from_cassini_oval(n_pts=100, variation=0.1):
+def sample_from_cassini_oval(n_pts: int = 100, variation: float = 0.1):
     t = np.linspace(-1, 1, int(n_pts/2))
     #t = np.sign(t)*np.abs(t)**(1/4)
     x = np.concatenate((t,t)) + variation * np.random.rand(n_pts)
@@ -58,14 +73,14 @@ def sample_from_cassini_oval(n_pts=100, variation=0.1):
 
 
 
-def sample_from_sphere(n_pts=100, ambient_dim=3, r=1):
+def sample_from_sphere(n_pts: int = 100, ambient_dim: int = 3, r: float = 1):
     vec = np.random.randn(ambient_dim, n_pts)
     vec /= np.linalg.norm(vec, axis=0)
     return vec.transpose()
 
 
 
-def sample_from_torus(n_pts=100, R=2, r=1):
+def sample_from_torus(n_pts: int = 100, R: float = 2, r: float = 1):
     nPtsSampled = 0
     theta = np.zeros([n_pts])
     phi = np.zeros([n_pts])
@@ -90,7 +105,7 @@ def sample_from_torus(n_pts=100, R=2, r=1):
 
 
 
-def figure_eight(n, a, b, variation=0):
+def figure_eight(n: int, a: float, b: float, variation: float = 0):
     # adapted from Bastian Rieck
     """Sample a set of points from a figure eight curve.
 
@@ -123,7 +138,7 @@ def figure_eight(n, a, b, variation=0):
 
 
 
-def sample_from_annulus(n, r, R, seed=None):
+def sample_from_annulus(n: int, r: float, R: float, seed=None):
     # taken from Bastian Rieck
     """Sample points from a 2D annulus.
 

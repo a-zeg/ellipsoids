@@ -10,6 +10,7 @@ from ellipsoids.data_handling import extract_barcodes_in_dim0_and_dim1
 from ellipsoids.data_handling import set_filename_parameters
 from ellipsoids.data_handling import filter_dictionary
 from ellipsoids.data_handling import get_paths_with_seed
+from ellipsoids.common import Dataset
 
 
 def test_json_process_variables():
@@ -276,3 +277,16 @@ def test_get_paths_with_seed():
 
 #     assert mydict['std'][1] == [0,2]
 
+
+def test_dataset():
+    points = np.array([[0,0],[0,1],[-1,0.5]])
+    datatype = "triangle"
+    dataset = Dataset(points, datatype)
+
+    target_n_points = 3
+    target_ambient_dim = 2
+
+    print(dataset.n_points())
+
+    assert dataset.n_points() == target_n_points
+    assert dataset.ambient_dim() == target_ambient_dim

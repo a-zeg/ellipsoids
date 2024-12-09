@@ -2,21 +2,28 @@ import gudhi as gd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+# from typing import Type
 
 from datetime import datetime
 
-from ellipsoids.topological_computations import Ellipsoid
+# from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.data_handling import read_variables
 from ellipsoids.topological_computations import reduceBarcode
 # from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode, plot_persistence_density
 from gudhi.persistence_graphical_tools import _limit_to_max_intervals, __min_birth_max_death
+from ellipsoids.topological_computations import spherisize_axes
+from ellipsoids.common import Ellipsoid
+from ellipsoids.common import EllipsoidParameters
+from ellipsoids.common import EllipsoidResults
+from ellipsoids.common import Results
+from ellipsoids.common import Dataset
 
 
-def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
+def plot_ellipse(ellipse: Ellipsoid, color='grey', r:float=1, axes=None, r_spherisize:float=np.inf):
     sampleRate = 100
     t = np.linspace(0, 2*np.pi, sampleRate)
-    xTemp = r*ellipse.axes_lengths[0]*np.cos(t)
-    yTemp = r*ellipse.axes_lengths[1]*np.sin(t)
+    xTemp = r*spherisize_axes(ellipse.axes_lengths[0], r=r, r_spherisize=r_spherisize)*np.cos(t)
+    yTemp = r*spherisize_axes(ellipse.axes_lengths[1], r=r, r_spherisize=r_spherisize)*np.sin(t)
     x = ellipse.center[0] + ellipse.axes[0,0]*xTemp + ellipse.axes[1,0]*yTemp
     y = ellipse.center[1] + ellipse.axes[0,1]*xTemp + ellipse.axes[1,1]*yTemp
     if axes is None:
@@ -24,7 +31,7 @@ def plotEllipse(ellipse: Ellipsoid, color='grey', r=1, axes=None):
     else:
         axes.plot(x,y,c=color)
 
-def plotEllipsoid(ellipsoid: Ellipsoid, color='grey', r=1, axes=None):
+def plot_ellipsoid(ellipsoid: Ellipsoid, color='grey', r:float=1, axes=None):
     # see https://stackoverflow.com/questions/7819498/plotting-ellipsoid-with-matplotlib
     sampleRate = 100
 
@@ -54,13 +61,14 @@ def plotEllipsoid(ellipsoid: Ellipsoid, color='grey', r=1, axes=None):
     else:
         axes.plot_surface(x,y,z, rstride=4, cstride=4, color=color, alpha = 0.2)
 
-def plotEllipses(ellipseList, r, axes=None):
-    for ellipse in ellipseList:
-        plotEllipse(ellipse, r=r, axes=axes)
 
-def plotEllipsoids(ellipsoidList, r, axes=None):
-    for ellipsoid in ellipsoidList:
-        plotEllipsoid(ellipsoid, r = r, axes=axes)
+def plot_ellipses(ellipse_list: list[Ellipsoid], r: float, axes=None, r_spherisize:float=np.inf):
+    for ellipse in ellipse_list:
+        plot_ellipse(ellipse, r=r, axes=axes, r_spherisize=r_spherisize)
+
+def plot_ellipsoids(ellipsoid_list, r, axes=None):
+    for ellipsoid in ellipsoid_list:
+        plot_ellipsoid(ellipsoid, r = r, axes=axes)
 
 def plotCircle(point, r=1, color='grey', axes=None):
     sample_rate = 100
@@ -76,7 +84,7 @@ def plotCircles(points, r=1, axes=None):
     for point in points:
         plotCircle(point, r=r, axes=axes)
 
-def plotSimplexTree(points, simplexTree, r, axes):
+def plot_simplex_tree(points, simplexTree, r, axes):
     dim = len(points[0])
     if dim > 3:
         raise Exception('Error: Attempting to plot simplex tree in dimension higher than 3.')
@@ -114,7 +122,7 @@ def plotSimplexTree(points, simplexTree, r, axes):
                         if dim == 2:
                             axes.fill(*np.transpose(points[vertices]), c='r', alpha=0.1)
 
-def plotDataPoints(points, axes=None):
+def plot_data_points(points, axes=None):
     if axes is None:
         plt.scatter(points[:,0],points[:,1])
     else:
@@ -125,6 +133,9 @@ def totuple(a):
         return tuple(totuple(i) for i in a)
     except TypeError:
         return a
+
+
+
 
 def visualisation(**kwargs):
     print('Generating plots...')
@@ -193,14 +204,14 @@ def visualisation(**kwargs):
                 print('Cannot plot ellipsoids, no list of ellipsoids provided.')
         
             if dim == 2:
-                plotEllipses(ellipsoidList, rPlot, axes=axData)
+                plot_ellipses(ellipsoidList, rPlot, axes=axData)
             if dim == 3:
-                plotEllipsoids(ellipsoidList, rPlot, axes=axData)
+                plot_ellipsoids(ellipsoidList, rPlot, axes=axData)
 
             if drawEllipsoidsSimplexTree:
                 if 'simplexTreeEllipsoids' in kwargs:
                     simplexTreeEllipsoids = kwargs['simplexTreeEllipsoids']
-                    plotSimplexTree(points, simplexTreeEllipsoids, rPlot, axes=axData)
+                    plot_simplex_tree(points, simplexTreeEllipsoids, rPlot, axes=axData)
                     axData.set_title(f'Point cloud data for {len(points)} points')# and the ellipsoid simplex tree for r = %0.2f' %(rPlot), fontsize=12)
                 else:
                     print('Cannot plot ellipsoid simplex tree; no ellipsoid simplex tree provided.')
@@ -472,3 +483,69 @@ def plot_barcode(
 
     return axes
 
+
+
+# def plot_barcode_axes(barcode, title, axes=None):
+
+
+def calculate_barcodes(results_list):
+
+    num_datasets = len(results_list)
+
+    list_barcodes = [None]*num_datasets
+    max_lengths = [None]*num_datasets
+
+    for i, results in enumerate(results_list):
+        list_barcodes[i], max_lengths[i] = reduceBarcode(results.barcode)
+
+    return list_barcodes, max(max_lengths) * 1.1
+
+
+
+def plot_results(results_list: list[Results],
+                 ellipsoid_params_list: list[EllipsoidParameters],
+                 dataset: Dataset,
+                 r: float = 1,
+                 draw_ellipsoids: bool = False,
+                 draw_simplex_tree: bool = False):
+
+    print("Plotting results...")
+
+    num_datasets = len(results_list)
+    num_plots_per_dataset = 1 + (draw_ellipsoids or draw_simplex_tree)
+    fig, axes = plt.subplots(num_datasets,
+                             num_plots_per_dataset,
+                             figsize=(15, num_datasets * 5))  # 3 subplots per dataset
+
+    list_barcodes, max_length = calculate_barcodes(results_list)
+
+    for i, results in enumerate(results_list):
+        print(f"Generating plot for dataset {i} of {num_datasets}... ", end='', flush=True)
+
+        # Plot the barcode
+        if num_plots_per_dataset == 1:
+            ax = axes[i]
+        else:
+            ax = axes[i][-1]
+        plot_barcode(list_barcodes[i], axes=ax, infinity=max_length, axis_start=-0.1)
+        ax.set_title(f"Barcode")
+
+        # maybe plot the points
+        if num_plots_per_dataset > 1:
+            plot_data_points(dataset.points, axes=axes[i,0])
+            axes[i][0].set_aspect('equal')
+
+            print(type(results))
+
+            if draw_ellipsoids and isinstance(results, EllipsoidResults):
+                plot_ellipses(results.ellipsoid_list, r, axes=axes[i][0])
+
+            if draw_simplex_tree:
+                plot_simplex_tree(dataset.points, results.simplex_tree, r, axes=axes[i,0])
+
+        print("Done.")
+
+    print("Done.")
+
+    plt.tight_layout()
+    plt.show()

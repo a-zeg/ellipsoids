@@ -2,16 +2,17 @@ import numpy as np
 import gudhi as gd
 import copy
 
-from ellipsoids.topological_computations import fit_ellipsoid, spherisize_by_filtration
+from ellipsoids.topological_computations import fit_ellipsoid, spherisize_axes
 from ellipsoids.topological_computations import generateEllipsoidSimplexTree4
 from ellipsoids.topological_computations import Ellipsoid
-from ellipsoids.topological_computations import findIntersectionRadius
+from ellipsoids.topological_computations import find_intersection_radius
 from ellipsoids.topological_computations import get_max_axes_ratio
 from ellipsoids.topological_computations import ellipsoid_intersection
 from ellipsoids.topological_computations import reduceBarcode
 from ellipsoids.topological_computations import padAxesRatios
 from ellipsoids.topological_computations import spherisize
 from ellipsoids.topological_computations import scale_to_01
+from ellipsoids.data_handling import printListOfSimplices
 # from src.topological_computations import get_axes_ratios
 
 def test_fit_ellipsoid():
@@ -70,7 +71,7 @@ def test_find_intersection_radius():
     ellipsoid1 = Ellipsoid(center1, axes1, axesLengths1)
     ellipsoid2 = Ellipsoid(center2, axes2, axesLengths2)
 
-    intersection_radius = findIntersectionRadius(ellipsoid1, ellipsoid2)
+    intersection_radius = find_intersection_radius(ellipsoid1, ellipsoid2)
     target_intersection_radius = 0.5
 
     assert np.isclose(intersection_radius, target_intersection_radius, atol=0.01)
@@ -182,6 +183,8 @@ def test_generate_ellipsoid_simplex_tree4():
         simplex_tree_target.insert(splx[0], filtration=splx[1])
 
     simplex_tree = generateEllipsoidSimplexTree4(points, nbhd_size, axes_ratios)
+    printListOfSimplices(simplex_tree_target)
+    printListOfSimplices(simplex_tree[0])
 
     assert _simplex_trees_equal(simplex_tree[0], simplex_tree_target)
 
@@ -282,6 +285,13 @@ def test_scale_to_01():
 
     assert np.isclose(scale_to_01(x1,min1,max1), target1)
 
+    x2 = 200
+    min2 = 0
+    max2 = np.inf
+    target2 = 0
+
+    assert np.isclose(scale_to_01(x2,min2,max2), target2)
+
 
 
 def test_spherisize_by_filtration():
@@ -298,14 +308,14 @@ def test_spherisize_by_filtration():
     target_axes_lengths_1_3 = np.array([5, 3.2, 3.2, 2.6])
 
     assert np.allclose(
-        spherisize_by_filtration(axes_lengths_1, r_1_1, spherisize_filtration=spherisize_filtration_1),
+        spherisize_axes(axes_lengths_1, r_1_1, r_spherisize=spherisize_filtration_1),
         target_axes_lengths_1_1
         )
     assert np.allclose(
-        spherisize_by_filtration(axes_lengths_1, r_1_2, spherisize_filtration=spherisize_filtration_1),
+        spherisize_axes(axes_lengths_1, r_1_2, r_spherisize=spherisize_filtration_1),
         target_axes_lengths_1_2
         )
     assert np.allclose(
-        spherisize_by_filtration(axes_lengths_1, r_1_3, spherisize_filtration=spherisize_filtration_1),
+        spherisize_axes(axes_lengths_1, r_1_3, r_spherisize=spherisize_filtration_1),
         target_axes_lengths_1_3
         )
