@@ -8,8 +8,8 @@ from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.topological_computations import find_intersection_radius
 from ellipsoids.topological_computations import get_max_axes_ratio
 from ellipsoids.topological_computations import ellipsoid_intersection
-from ellipsoids.topological_computations import reduceBarcode
-from ellipsoids.topological_computations import padAxesRatios
+from ellipsoids.topological_computations import reduce_barcode
+from ellipsoids.topological_computations import pad_axes_ratios
 from ellipsoids.topological_computations import spherisize
 from ellipsoids.topological_computations import scale_to_01
 from ellipsoids.data_handling import printListOfSimplices
@@ -96,6 +96,7 @@ def test_get_max_axes_ratio():
     assert get_max_axes_ratio(ellipsoid2) == target_axes_ratio2 
 
 
+# TODO: put these two into test/utils.py and have a separate test_utils file where they're tested
 def _simplex_tree_to_list(simplex_tree: gd.SimplexTree):
 
     generator = simplex_tree.get_filtration()
@@ -183,8 +184,8 @@ def test_generate_ellipsoid_simplex_tree4():
         simplex_tree_target.insert(splx[0], filtration=splx[1])
 
     simplex_tree = generateEllipsoidSimplexTree4(points, nbhd_size, axes_ratios)
-    printListOfSimplices(simplex_tree_target)
-    printListOfSimplices(simplex_tree[0])
+    # printListOfSimplices(simplex_tree_target)
+    # printListOfSimplices(simplex_tree[0])
 
     assert _simplex_trees_equal(simplex_tree[0], simplex_tree_target)
 
@@ -218,7 +219,7 @@ def test_reduce_barcode():
         [0, [-0.5, 1]]
     ]
 
-    reduced_barcode, _ = reduceBarcode(barcode, nBarsDim0=2)
+    reduced_barcode, _ = reduce_barcode(barcode, nBarsDim0=2, nBarsDim1=0, nBarsDim2=0)
     assert target_barcode == reduced_barcode
 
 
@@ -226,7 +227,7 @@ def test_reduce_barcode():
         [0, [0,1]]
     ]
 
-    reduced_barcode, _ = reduceBarcode(barcode, nBarsDim0=1)
+    reduced_barcode, _ = reduce_barcode(barcode, nBarsDim0=1, nBarsDim1=0, nBarsDim2=0)
     assert target_barcode == reduced_barcode
 
 
@@ -241,13 +242,13 @@ def test_pad_axes_ratios():
     axes_ratios_1 = np.array([3,1])
     dim_1 = 3
     target_axes_ratios_1 = np.array([3,1,1])
-    assert np.array_equal(target_axes_ratios_1, padAxesRatios(axes_ratios_1, dim_1))
+    assert np.array_equal(target_axes_ratios_1, pad_axes_ratios(axes_ratios_1, dim_1))
 
 
     axes_ratios_2 = np.array([3,1,1,1,1])
     dim_2 = 3
     target_axes_ratios_2 = np.array([3,1,1])
-    assert np.array_equal(target_axes_ratios_2, padAxesRatios(axes_ratios_2, dim_2))
+    assert np.array_equal(target_axes_ratios_2, pad_axes_ratios(axes_ratios_2, dim_2))
 
 
 
@@ -257,21 +258,24 @@ def test_spherisize():
 
     target_axes_lengths_1 = axes_lengths.astype(float)
     s_1 = 0
+    assert np.allclose(spherisize(axes_lengths, s_1), target_axes_lengths_1)
+
     target_axes_lengths_2 = np.array([3,3,3])
     s_2 = 1
+    assert np.allclose(spherisize(axes_lengths, s_2), target_axes_lengths_2)
+
     target_axes_lengths_3 = np.array([3,2.5,2])
     s_3 = 0.5
+    assert np.allclose(spherisize(axes_lengths, s_3), target_axes_lengths_3)
+
     axes_lengths_4 = np.array([1,0.5])
     target_axes_lengths_4 = np.array([1,0.8])
     s_4 = 0.6
+    assert np.allclose(spherisize(axes_lengths_4, s_4), target_axes_lengths_4)
+
     axes_lengths_5 = np.array([5,2,2,1])
     target_axes_lengths_5 = np.array([5, 3.2, 3.2, 2.6])
     s_5 = 0.4
-
-    assert np.allclose(spherisize(axes_lengths, s_1), target_axes_lengths_1)
-    assert np.allclose(spherisize(axes_lengths, s_2), target_axes_lengths_2)
-    assert np.allclose(spherisize(axes_lengths, s_3), target_axes_lengths_3)
-    assert np.allclose(spherisize(axes_lengths_4, s_4), target_axes_lengths_4)
     assert np.allclose(spherisize(axes_lengths_5, s_5), target_axes_lengths_5)
 
 
@@ -301,20 +305,22 @@ def test_spherisize_by_filtration():
     r_1_1 = 12
     target_axes_lengths_1_1 = np.array([5,5,5,5])
 
-    r_1_2 = -1
-    target_axes_lengths_1_2 = axes_lengths_1
-
-    r_1_3 = 4
-    target_axes_lengths_1_3 = np.array([5, 3.2, 3.2, 2.6])
-
     assert np.allclose(
         spherisize_axes(axes_lengths_1, r_1_1, r_spherisize=spherisize_filtration_1),
         target_axes_lengths_1_1
         )
+
+    r_1_2 = -1
+    target_axes_lengths_1_2 = axes_lengths_1
+
     assert np.allclose(
         spherisize_axes(axes_lengths_1, r_1_2, r_spherisize=spherisize_filtration_1),
         target_axes_lengths_1_2
         )
+
+    r_1_3 = 4
+    target_axes_lengths_1_3 = np.array([5, 3.2, 3.2, 2.6])
+
     assert np.allclose(
         spherisize_axes(axes_lengths_1, r_1_3, r_spherisize=spherisize_filtration_1),
         target_axes_lengths_1_3
