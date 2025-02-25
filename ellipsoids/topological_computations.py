@@ -15,8 +15,9 @@ from multiprocessing import Pool
 from multiprocessing import cpu_count
 
 from ellipsoids.common import Dataset
+from ellipsoids.common import Parameters
 from ellipsoids.common import EllipsoidParameters
-from ellipsoids.common import ComplexType
+from ellipsoids.common import ComplexSubtype
 from ellipsoids.common import Results
 from ellipsoids.common import EllipsoidResults
 from ellipsoids.common import Ellipsoid
@@ -108,6 +109,13 @@ def spherisize_axes(axes_lengths: np.ndarray, r: float, r_spherisize: float = 10
 
 
 
+def K(s, lambdas, v_squared, r):
+    ''' Auxiliary function needed in ellipsoidIntersection
+    '''
+    return 1.-(1./r**2)*np.sum(v_squared*((s*(1.-s))/(1.+s*(lambdas-1.))))
+
+
+
 def _ellipsoid_intersection(center_1: np.ndarray, axes_lengths_1: np.ndarray, axes_1: np.ndarray,
                             center_2: np.ndarray, axes_lengths_2: np.ndarray, axes_2: np.ndarray,
                             r: float):
@@ -154,14 +162,6 @@ def ellipsoid_intersection(ellipsoid_1: Ellipsoid,
     return _ellipsoid_intersection(ellipsoid_1.center, axes_lengths_1, ellipsoid_1.axes,
                                    ellipsoid_2.center, axes_lengths_2, ellipsoid_2.axes,
                                    r)
-
-
-
-
-def K(s, lambdas, v_squared, r):
-    ''' Auxiliary function needed in ellipsoidIntersection
-    '''
-    return 1.-(1./r**2)*np.sum(v_squared*((s*(1.-s))/(1.+s*(lambdas-1.))))
 
 
 
@@ -283,11 +283,25 @@ def generate_alpha_ellipsoid_simplex_tree(dataset: Dataset,
     # insert points
     [simplex_tree.insert([i],0) for i in np.arange(len(points))]
 
-    vor = Voronoi(points)
-    for [i,j] in vor.ridge_points:
-        intersection_radius = find_intersection_radius(ellipsoid_list[i], ellipsoid_list[j])
-        simplex_tree.insert([i,j], intersection_radius)
+    # vor = Voronoi(points)
+    # for [i,j] in vor.ridge_points:
+    #     intersection_radius = find_intersection_radius(ellipsoid_list[i], ellipsoid_list[j])
+    #     simplex_tree.insert([i,j], intersection_radius)
 
+
+    vor = Voronoi(points)
+    for vertex, _ in enumerate(vor.vertices):
+        adjacents = []
+        for ridge_idx, ridge in enumerate(vor.ridge_vertices):
+            if vertex in ridge:
+                adjacents.extend(vor.ridge_points[ridge_idx])
+
+        adjacents = list(set(adjacents))
+
+        for i, vertex_i in enumerate(adjacents):
+            for j, vertex_j in enumerate(adjacents[i+1:], start=i+1):
+                intersection_radius = find_intersection_radius(ellipsoid_list[vertex_i], ellipsoid_list[vertex_j])
+                simplex_tree.insert([vertex_i,vertex_j], intersection_radius)
 
     print('Done.\n')
     return [simplex_tree, ellipsoid_list]
@@ -324,28 +338,55 @@ def generateEllipsoidSimplexTree4_new(points: np.ndarray, nbhdSize: int, axesRat
     return [simplexTree, ellipsoidList]
 
 
-def generateRipsSimplexTree(points):
+def generate_rips_simplex_tree(points):
 
     print('Creating the Rips complex... ', end='', flush=True)
-    ripsComplex = gd.RipsComplex(points=points)
+    rips_complex = gd.RipsComplex(points=points)
     print('Done.')
 
     print('Creating the Rips simplex tree... ', end='', flush=True)
-    simplexTreeRips = ripsComplex.create_simplex_tree(max_dimension=1)
+    simplex_tree = rips_complex.create_simplex_tree(max_dimension=1)
     print('Done.')
 
-    return simplexTreeRips
+    return simplex_tree
 
 
-def expandTreeAndCalculateBarcode(simplexTree, expansionDim, collapseEdges=False):
+def double_filtrations(simplex_tree):
+    for simplex in simplex_tree.get_simplices():
+
+        simplex_set = simplex[0]  # Get the simplex (set of vertices)
+        filtration_value = simplex[1]  # Get the current filtration value
+        simplex_tree.assign_filtration(simplex_set, 2*filtration_value)
+
+    return simplex_tree
+
+
+
+def generate_alpha_simplex_tree(points):
+
+    print('Creating the alpha complex... ', end='', flush=True)
+    alpha_complex = gd.AlphaComplex(points=points)
+    print('Done.')
+
+    print('Creating the alpha simplex tree... ', end='', flush=True)
+    simplex_tree = alpha_complex.create_simplex_tree()
+    print('Done.')
+
+    simplex_tree = double_filtrations(simplex_tree)
+
+    return simplex_tree
+
+
+
+def calculate_barcode(simplexTree, expansion_dim=2, collapse_edges=False):
     simplexTreeExpanded = simplexTree.copy()
-    if collapseEdges:
+    if collapse_edges:
         print('Collapsing edges...', end='', flush=True)
         simplexTreeExpanded.collapse_edges()
         print('Done.')
 
     print('Expanding the simplex tree... ', end='', flush=True)
-    simplexTreeExpanded.expansion(expansionDim) # expands the simplicial complex to include 
+    simplexTreeExpanded.expansion(expansion_dim) # expands the simplicial complex to include
                                                 # dim-dimensional simplices whose 1-skeleton is in simplexTree
     print('Done.')
 
@@ -355,10 +396,13 @@ def expandTreeAndCalculateBarcode(simplexTree, expansionDim, collapseEdges=False
 
     return barcode
 
+
+
 def maxFiltration(simplexTree):
     generator = simplexTree.get_filtration()
     simplexList = list(generator)
     return max(splx[1] for splx in simplexList)
+
 
 
 def set_max_bar_end(bar, max_bar_end):
@@ -367,7 +411,9 @@ def set_max_bar_end(bar, max_bar_end):
         max_bar_end = bar_end
     return max_bar_end
 
-def reduceBarcode(barcode, nBarsDim0 = 10, nBarsDim1 = 10, nBarsDim2 = 10):
+
+
+def reduce_barcode(barcode, nBarsDim0 = 10, nBarsDim1 = 10, nBarsDim2 = 10):
     # return only the first nBarsDimk bars in each dimension k
     reduced_barcode = []
     max_bar_end = 0
@@ -387,32 +433,7 @@ def reduceBarcode(barcode, nBarsDim0 = 10, nBarsDim1 = 10, nBarsDim2 = 10):
     
     return reduced_barcode, max_bar_end
     
-# TODO those blocks below should be separate functions
-# def reduceBarcode(barcode, nBarsDim0 = 1, nBarsDim1 = 0, nBarsDim2 = 0):
-#     # return only nBarsDimk longest bars in each dimension k
-#     reducedBarcode = []
-#     maxBarEnd = 0
-#     for bar in barcode:
-#         if bar[0] == 0 and nBarsDim0 > 0:
-#             reducedBarcode.append(bar)
-#             nBarsDim0 = nBarsDim0 - 1
-#             barEnd = bar[1][1]
-#             if barEnd != float('inf') and barEnd > maxBarEnd:
-#                 maxBarEnd = barEnd
-#         elif bar[0] == 1 and nBarsDim1 > 0:
-#             reducedBarcode.append(bar)
-#             nBarsDim1 = nBarsDim1 - 1
-#             barEnd = bar[1][1]
-#             if barEnd != float('inf') and barEnd > maxBarEnd:
-#                 maxBarEnd = barEnd
-#         elif bar[0] == 2 and nBarsDim2 > 0:
-#             reducedBarcode.append(bar)
-#             nBarsDim2 = nBarsDim2 - 1
-#             barEnd = bar[1][1]
-#             if barEnd != float('inf') and barEnd > maxBarEnd:
-#                 maxBarEnd = barEnd
-    
-#     return reducedBarcode, maxBarEnd
+
 
 def calculateBottleeckDistance(barcode1, barcode2, dim):
     npBarcode1 = np.array()
@@ -426,7 +447,8 @@ def calculateBottleeckDistance(barcode1, barcode2, dim):
     return bottleneckDistance
 
 
-def padAxesRatios(axesRatios: np.array, dim: int):
+
+def pad_axes_ratios(axesRatios: np.ndarray, dim: int):
     ''' For high dimensional ellipsoids, it is enough for the user to specify 
     the first few axes. This function will set the remaining axes to 1.'''
     if dim > len(axesRatios):
@@ -434,7 +456,8 @@ def padAxesRatios(axesRatios: np.array, dim: int):
     else: 
         return axesRatios[0:dim]
 
-    
+
+
 def calculate_ellipsoid_barcode(points: np.ndarray,
                                 nbhd_size: int,
                                 axes_ratios: np.ndarray,
@@ -462,14 +485,14 @@ def calculate_ellipsoid_barcode(points: np.ndarray,
             total_time (int): total execution time in seconds
     '''
     dim = len(points[0])
-    axes_ratios = padAxesRatios(axes_ratios,dim)
+    axes_ratios = pad_axes_ratios(axes_ratios,dim)
 
     t0_simplex_tree = time.time()
     [simplex_tree, ellipsoid_list] = generateEllipsoidSimplexTree4(points, nbhd_size, axes_ratios, r_spherisize)
     t1_simplex_tree = time.time()
 
     t0_barcode = time.time()
-    barcode = expandTreeAndCalculateBarcode(simplex_tree, expansion_dim, collapseEdges=collapse_edges)
+    barcode = calculate_barcode(simplex_tree, expansion_dim, collapse_edges=collapse_edges)
     t1_barcode = time.time()
 
     total_time = t1_barcode - t0_barcode + t1_simplex_tree - t0_simplex_tree
@@ -481,27 +504,56 @@ def calculate_ellipsoid_barcode(points: np.ndarray,
 def calculate_rips_barcode(points: np.ndarray, expansion_dim=2, collapse_edges=True):
 
     t0_simplex_tree = time.time()
-    simplex_tree = generateRipsSimplexTree(points)
+    simplex_tree = generate_rips_simplex_tree(points)
     t1_simplex_tree = time.time()
 
     t0_barcode = time.time()
-    barcode = expandTreeAndCalculateBarcode(simplex_tree, expansion_dim, collapseEdges=collapse_edges)
+    barcode = calculate_barcode(simplex_tree, expansion_dim, collapse_edges=collapse_edges)
     t1_barcode = time.time()
 
     total_time = t1_barcode - t0_barcode + t1_simplex_tree - t0_simplex_tree
 
     return barcode, simplex_tree, total_time
-    
 
 
-def calculate_ellipsoids(dataset: Dataset, ellipsoid_parameters: EllipsoidParameters):
+
+def calculate_rips(dataset: Dataset, parameters: Parameters) -> Results:
+
+    t0_simplex_tree = time.time()
+    if parameters.complex_subtype == ComplexSubtype.RIPS:
+        simplex_tree = generate_rips_simplex_tree(dataset.points)
+    elif parameters.complex_subtype == ComplexSubtype.ALPHA:
+        simplex_tree = generate_alpha_simplex_tree(dataset.points)
+    else:
+        exit(f"{parameters.complex_subtype} is an invalid complex type.")
+    t1_simplex_tree = time.time()
+
+    t0_barcode = time.time()
+    barcode = calculate_barcode(simplex_tree,
+                                parameters.expansion_dim,
+                                collapse_edges=parameters.collapse_edges)
+    t1_barcode = time.time()
+    execution_time = t1_barcode - t0_barcode + t1_simplex_tree - t0_simplex_tree
+
+    results = Results()
+
+    if parameters.save_simplex_tree: results.simplex_tree = simplex_tree
+
+    results.barcode = barcode
+    results.execution_time = execution_time
+
+    return results
+
+
+
+def calculate_ellipsoids(dataset: Dataset, ellipsoid_parameters: EllipsoidParameters) -> EllipsoidResults:
 
     dim = dataset.ambient_dim()
-    axes_ratios = padAxesRatios(ellipsoid_parameters.axes_ratios, dim)
+    axes_ratios = pad_axes_ratios(ellipsoid_parameters.axes_ratios, dim)
 
     t0_simplex_tree = time.time()
 
-    if (ellipsoid_parameters.complex_type == ComplexType.ALPHA):
+    if (ellipsoid_parameters.complex_subtype == ComplexSubtype.ALPHA):
         simplex_tree, ellipsoid_list = generate_alpha_ellipsoid_simplex_tree(dataset, ellipsoid_parameters)
     else:
         points = dataset.points
@@ -512,9 +564,9 @@ def calculate_ellipsoids(dataset: Dataset, ellipsoid_parameters: EllipsoidParame
     t1_simplex_tree = time.time()
 
     t0_barcode = time.time()
-    barcode = expandTreeAndCalculateBarcode(simplex_tree,
-                                            ellipsoid_parameters.expansion_dim,
-                                            collapseEdges=ellipsoid_parameters.collapse_edges)
+    barcode = calculate_barcode(simplex_tree,
+                                ellipsoid_parameters.expansion_dim,
+                                collapse_edges=ellipsoid_parameters.collapse_edges)
     t1_barcode = time.time()
 
     execution_time = t1_barcode - t0_barcode + t1_simplex_tree - t0_simplex_tree

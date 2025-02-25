@@ -19,13 +19,13 @@ sys.path.append(os.path.abspath('.'))
 
 from ellipsoids.topological_computations import calculate_ellipsoid_barcode
 from ellipsoids.topological_computations import calculate_rips_barcode
-from ellipsoids.topological_computations import expandTreeAndCalculateBarcode
+from ellipsoids.topological_computations import calculate_barcode
 
 
 from ellipsoids.common import Ellipsoid
 from ellipsoids.common import Dataset
 from ellipsoids.common import EllipsoidParameters
-from ellipsoids.common import ComplexType
+from ellipsoids.common import ComplexSubtype
 from ellipsoids.common import Results
 
 
@@ -510,8 +510,8 @@ def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
     else: simplexTreeRips = gd.SimplexTree()
     print('Done.')
     
-    barcodeEllipsoids = expandTreeAndCalculateBarcode(simplexTreeEllipsoids, expansionDim, collapseEdges=collapseEdges)
-    barcodeRips = expandTreeAndCalculateBarcode(simplexTreeRips, expansionDim, collapseEdges=collapseEdges)
+    barcodeEllipsoids = calculate_barcode(simplexTreeEllipsoids, expansionDim, collapse_edges=collapseEdges)
+    barcodeRips = calculate_barcode(simplexTreeRips, expansionDim, collapse_edges=collapseEdges)
     
     dictOfVars = {
         'originalFile': filename, 
