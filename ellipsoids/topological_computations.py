@@ -10,7 +10,7 @@ from sklearn.neighbors import KDTree
 from scipy import spatial
 from scipy.linalg import eigh
 from scipy.optimize import minimize_scalar
-from scipy.spatial import Voronoi
+from scipy.spatial import Delaunay, Voronoi
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 
@@ -149,7 +149,7 @@ def ellipsoid_intersection(ellipsoid_1: Ellipsoid,
                            r: float,
                            r_spherisize: float = np.inf):
     ''' Checks whether ellipsoid_1 and ellipsoid_2 at the filtration level r intersect.
-    If spherisize_filtration is not None, then the axes_lengths will be adapted so that
+    If r_spherisize is not infinite, the axes_lengths will be linearly adapted so that
     for filtrations above spherisize_filtration, the ellipsoids become spheres
     '''
 
@@ -199,24 +199,6 @@ def find_intersection_radius(ellipsoid_1: Ellipsoid,
         else: r = (minIntersectionFiltration + maxNonIntersectionFiltration)/2
 
 
-    
-def generateEllipsoidSimplexTree3(points, nbhdSize, axesRatios):
-    ''' list comprehesion '''
-
-    ellipsoidList = fit_ellipsoids(points, nbhdSize, axesRatios)
-
-    print('Calculating ellipsoid simplex tree... ', end='', flush=True)
-
-    simplexTree = gd.SimplexTree()
-    [simplexTree.insert([i],0) for i in np.arange(len(points))]
-    
-    pairs = [(i,j) for i in np.arange(len(points)) for j in np.arange(i+1,len(points))]
-    [simplexTree.insert([i,j], find_intersection_radius(ellipsoidList[i],ellipsoidList[j],axesRatios=axesRatios)) for (i,j) in pairs]
-
-    print('Done.')
-
-    return [simplexTree, ellipsoidList]
-
 
 def wrapper_find_intersection_radius(ellipsoid_1, ellipsoid_2, r_spherisize: float):
     '''
@@ -227,7 +209,7 @@ def wrapper_find_intersection_radius(ellipsoid_1, ellipsoid_2, r_spherisize: flo
 
 
 
-def generateEllipsoidSimplexTree4(points: np.ndarray,
+def generate_ellipsoid_simplex_tree(points: np.ndarray,
                                   nbhd_size: int,
                                   axes_ratios: np.ndarray,
                                   r_spherisize: float = np.inf):
@@ -265,10 +247,17 @@ def generateEllipsoidSimplexTree4(points: np.ndarray,
 
 
 
+def adjacent_voronoi_vertices(vertex, vor: Voronoi):
+    adjacents = []
+    for ridge_idx, ridge in enumerate(vor.ridge_vertices):
+        if vertex in ridge:
+            adjacents.extend(vor.ridge_points[ridge_idx])
+    return list(set(adjacents))
 
-def generate_alpha_ellipsoid_simplex_tree(dataset: Dataset,
+
+
+def generate_alpha_ellipsoid_simplex_tree_old(dataset: Dataset,
                                           ellipsoid_parameters: EllipsoidParameters):
-
     points = dataset.points
     nbhd_size = ellipsoid_parameters.nbhd_size
     axes_ratios = ellipsoid_parameters.axes_ratios
@@ -279,49 +268,95 @@ def generate_alpha_ellipsoid_simplex_tree(dataset: Dataset,
     print('Calculating alpha ellipsoid simplex tree... ', end='', flush=True)
 
     simplex_tree = gd.SimplexTree()
-
-    # insert points
     [simplex_tree.insert([i],0) for i in np.arange(len(points))]
-
-    # vor = Voronoi(points)
-    # for [i,j] in vor.ridge_points:
-    #     intersection_radius = find_intersection_radius(ellipsoid_list[i], ellipsoid_list[j])
-    #     simplex_tree.insert([i,j], intersection_radius)
-
 
     vor = Voronoi(points)
     for vertex, _ in enumerate(vor.vertices):
-        adjacents = []
-        for ridge_idx, ridge in enumerate(vor.ridge_vertices):
-            if vertex in ridge:
-                adjacents.extend(vor.ridge_points[ridge_idx])
-
-        adjacents = list(set(adjacents))
+        adjacents = adjacent_voronoi_vertices(vertex, vor)
 
         for i, vertex_i in enumerate(adjacents):
-            for j, vertex_j in enumerate(adjacents[i+1:], start=i+1):
-                intersection_radius = find_intersection_radius(ellipsoid_list[vertex_i], ellipsoid_list[vertex_j])
+            for _, vertex_j in enumerate(adjacents[i+1:], start=i+1):
+                intersection_radius = find_intersection_radius(ellipsoid_list[vertex_i],
+                                                               ellipsoid_list[vertex_j],
+                                                               r_spherisize=r_spherisize)
                 simplex_tree.insert([vertex_i,vertex_j], intersection_radius)
 
     print('Done.\n')
     return [simplex_tree, ellipsoid_list]
 
 
+def adjacent_delaunay_vertices(tri, vertex_index):
+    """
+    Given a Delaunay triangulation and a vertex index, return a list of all adjacent vertices.
+
+    Parameters:
+    tri (Delaunay): A Delaunay object containing the triangulation.
+    vertex_index (int): The index of the vertex whose adjacent vertices are to be found.
+
+    Returns:
+    List[int]: A list of indices of adjacent vertices.
+    """
+    adjacent_vertices = set()
+
+    # Loop through all simplices (triangles)
+    for i, simplex in enumerate(tri.simplices):
+        if vertex_index in simplex:
+            # Add the other two vertices (those adjacent to the given vertex)
+            adjacent_vertices.update(simplex[simplex != vertex_index])
+
+    # Convert set to sorted list for easy viewing
+    return sorted(adjacent_vertices)
 
 
-def generateEllipsoidSimplexTree4_new(points: np.ndarray, nbhdSize: int, axesRatios: np.ndarray, r_spherisize: float = np.inf):
-    ''' multiprocessing '''
-    ''' Creates a simplex tree from the ellipsoids by adding an edge between each two points whose 
-    corresponding ellipsoids intersect.
-    :kdTree: KD tree of the initial dataset
-    :ellipsoidList: list of ellipsoids (output of ??)
-    :queryRadius:
-    :filtrationValues:
 
-    :return: gudhi.SimplexTree
-    '''
+def generate_alpha_ellipsoid_simplex_tree(dataset: Dataset,
+                                          ellipsoid_parameters: EllipsoidParameters):
+    points = dataset.points
+    nbhd_size = ellipsoid_parameters.nbhd_size
+    axes_ratios = ellipsoid_parameters.axes_ratios
+    r_spherisize = ellipsoid_parameters.r_spherisize
 
-    ellipsoidList: list[Ellipsoid] = fit_ellipsoids(points, nbhdSize, axesRatios)
+    ellipsoid_list: list[Ellipsoid] = fit_ellipsoids(points, nbhd_size, axes_ratios)
+
+    print('Calculating alpha ellipsoid simplex tree... ', end='', flush=True)
+
+    simplex_tree = gd.SimplexTree()
+    [simplex_tree.insert([i],0) for i in np.arange(len(points))]
+
+    delaunay = Delaunay(points)
+    for vertex_index, _ in enumerate(delaunay.points):
+        adjacent_vertices = adjacent_delaunay_vertices(delaunay, vertex_index)
+
+        for adjacent_vertex in adjacent_vertices:
+            vertex_i = vertex_index
+            vertex_j = adjacent_vertex
+            intersection_radius = find_intersection_radius(ellipsoid_list[vertex_i],
+                                                            ellipsoid_list[vertex_j],
+                                                            r_spherisize=r_spherisize)
+            simplex_tree.insert([vertex_i,vertex_j], intersection_radius)
+
+    print('Done.\n')
+    return [simplex_tree, ellipsoid_list]
+
+
+def expand_simplex_tree(simplex_tree, expansion_dim=2):
+    print("Expanding the simplex tree...", end="", flush=True)
+    simplex_tree.expansion(expansion_dim)
+    print("Done.")
+    return simplex_tree
+
+
+def collapse_edges(simplex_tree):
+    print('Collapsing edges...', end='', flush=True)
+    simplex_tree.collapse_edges()
+    print('Done.')
+    return simplex_tree
+
+
+
+def generate_ellipsoid_simplex_tree__single_process(points: np.ndarray, nbhd_size: int, axes_ratios: np.ndarray, r_spherisize: float = np.inf):
+
+    ellipsoidList: list[Ellipsoid] = fit_ellipsoids(points, nbhd_size, axes_ratios)
 
     print('Calculating ellipsoid simplex tree... ', end='', flush=True)
 
@@ -333,12 +368,12 @@ def generateEllipsoidSimplexTree4_new(points: np.ndarray, nbhdSize: int, axesRat
             intersection_radius = find_intersection_radius(ellipsoid1, ellipsoid2)
             simplexTree.insert([i, j+i], intersection_radius)
 
-
     print('Done.')
     return [simplexTree, ellipsoidList]
 
 
-def generate_rips_simplex_tree(points):
+
+def generate_rips_simplex_tree(points, expansion_dim=2):
 
     print('Creating the Rips complex... ', end='', flush=True)
     rips_complex = gd.RipsComplex(points=points)
@@ -347,6 +382,7 @@ def generate_rips_simplex_tree(points):
     print('Creating the Rips simplex tree... ', end='', flush=True)
     simplex_tree = rips_complex.create_simplex_tree(max_dimension=1)
     print('Done.')
+
 
     return simplex_tree
 
@@ -378,20 +414,23 @@ def generate_alpha_simplex_tree(points):
 
 
 
-def calculate_barcode(simplexTree, expansion_dim=2, collapse_edges=False):
-    simplexTreeExpanded = simplexTree.copy()
-    if collapse_edges:
-        print('Collapsing edges...', end='', flush=True)
-        simplexTreeExpanded.collapse_edges()
-        print('Done.')
+def calculate_barcode(simplex_tree, expansion_dim=2, collapse_edges=False):
+    # simplexTreeExpanded = simplexTree.copy()
+    # if collapse_edges:
+    #     print('Collapsing edges...', end='', flush=True)
+    #     simplexTreeExpanded.collapse_edges()
+    #     print('Done.')
 
-    print('Expanding the simplex tree... ', end='', flush=True)
-    simplexTreeExpanded.expansion(expansion_dim) # expands the simplicial complex to include
-                                                # dim-dimensional simplices whose 1-skeleton is in simplexTree
-    print('Done.')
+    # print('Expanding the simplex tree... ', end='', flush=True)
+    # simplexTreeExpanded.expansion(expansion_dim) # expands the simplicial complex to include
+    #                                             # dim-dimensional simplices whose 1-skeleton is in simplexTree
+    # print('Done.')
 
+    # print('Calculating the barcode of the expanded tree... ', end='', flush=True)
+    # barcode = simplexTreeExpanded.persistence()
+    # print('Done.\n')
     print('Calculating the barcode of the expanded tree... ', end='', flush=True)
-    barcode = simplexTreeExpanded.persistence()
+    barcode = simplex_tree.persistence()
     print('Done.\n')
 
     return barcode
@@ -435,16 +474,16 @@ def reduce_barcode(barcode, nBarsDim0 = 10, nBarsDim1 = 10, nBarsDim2 = 10):
     
 
 
-def calculateBottleeckDistance(barcode1, barcode2, dim):
-    npBarcode1 = np.array()
-    npBarcode2 = np.array()
-    for line in barcode1:
-        npBarcode1[line[0]].append(line[1])
-    for line in barcode2:
-        npBarcode2[line[0]].append(line[1])
+# def calculateBottleeckDistance(barcode1, barcode2, dim):
+#     npBarcode1 = np.array()
+#     npBarcode2 = np.array()
+#     for line in barcode1:
+#         npBarcode1[line[0]].append(line[1])
+#     for line in barcode2:
+#         npBarcode2[line[0]].append(line[1])
 
-    bottleneckDistance = [gd.bottleneck_distance(i,j) for i,j in zip(npBarcode1, npBarcode2)]
-    return bottleneckDistance
+#     bottleneckDistance = [gd.bottleneck_distance(i,j) for i,j in zip(npBarcode1, npBarcode2)]
+#     return bottleneckDistance
 
 
 
@@ -488,7 +527,7 @@ def calculate_ellipsoid_barcode(points: np.ndarray,
     axes_ratios = pad_axes_ratios(axes_ratios,dim)
 
     t0_simplex_tree = time.time()
-    [simplex_tree, ellipsoid_list] = generateEllipsoidSimplexTree4(points, nbhd_size, axes_ratios, r_spherisize)
+    [simplex_tree, ellipsoid_list] = generate_ellipsoid_simplex_tree(points, nbhd_size, axes_ratios, r_spherisize)
     t1_simplex_tree = time.time()
 
     t0_barcode = time.time()
@@ -528,6 +567,12 @@ def calculate_rips(dataset: Dataset, parameters: Parameters) -> Results:
         exit(f"{parameters.complex_subtype} is an invalid complex type.")
     t1_simplex_tree = time.time()
 
+    if parameters.collapse_edges:
+        collapse_edges(simplex_tree)
+
+    if parameters.expansion_dim > 1:
+        expand_simplex_tree(simplex_tree)
+
     t0_barcode = time.time()
     barcode = calculate_barcode(simplex_tree,
                                 parameters.expansion_dim,
@@ -559,7 +604,7 @@ def calculate_ellipsoids(dataset: Dataset, ellipsoid_parameters: EllipsoidParame
         points = dataset.points
         nbhd_size = ellipsoid_parameters.nbhd_size
         r_spherisize = ellipsoid_parameters.r_spherisize
-        [simplex_tree, ellipsoid_list] = generateEllipsoidSimplexTree4(points, nbhd_size, axes_ratios, r_spherisize)
+        [simplex_tree, ellipsoid_list] = generate_ellipsoid_simplex_tree(points, nbhd_size, axes_ratios, r_spherisize)
 
     t1_simplex_tree = time.time()
 

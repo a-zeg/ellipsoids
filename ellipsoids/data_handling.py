@@ -105,7 +105,7 @@ def sample_from_torus(n_pts: int = 100, R: float = 2, r: float = 1):
 
 
 
-def figure_eight(n: int, a: float, b: float, variation: float = 0):
+def sample_from_figure_eight(n: int, a: float, b: float, variation: float = 0):
     # adapted from Bastian Rieck
     """Sample a set of points from a figure eight curve.
 
@@ -233,6 +233,8 @@ class CustomEncoder(json.JSONEncoder):
             return int(obj)
         
         return json.JSONEncoder.default(self, obj)
+
+
 
 def ensure_folder_exists(filename):
     """
@@ -377,8 +379,12 @@ def printListOfSimplices(simplexTree):
 
 
 
-def get_paths_of_files_in_a_folder(folder: str, extension='.mat'):
-    filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(extension)]
+def get_paths_of_files_in_a_folder(folder: str, extension=None):
+    if extension is not None:
+        filenames = [f for f in listdir(folder) if isfile(join(folder, f)) if f.endswith(extension)]
+    else:
+        filenames = [f for f in listdir(folder) if isfile(join(folder, f))]
+
     paths = [os.path.join(folder, f) for f in filenames] 
     return paths
 

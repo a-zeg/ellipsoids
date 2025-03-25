@@ -2,8 +2,10 @@ import numpy as np
 import gudhi as gd
 import copy
 
+from scipy.spatial import Delaunay, Voronoi
+
 from ellipsoids.topological_computations import fit_ellipsoid, spherisize_axes
-from ellipsoids.topological_computations import generateEllipsoidSimplexTree4
+from ellipsoids.topological_computations import generate_ellipsoid_simplex_tree
 from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.topological_computations import find_intersection_radius
 from ellipsoids.topological_computations import get_max_axes_ratio
@@ -13,6 +15,7 @@ from ellipsoids.topological_computations import pad_axes_ratios
 from ellipsoids.topological_computations import spherisize
 from ellipsoids.topological_computations import scale_to_01
 from ellipsoids.data_handling import printListOfSimplices
+from ellipsoids.topological_computations import adjacent_delaunay_vertices
 # from src.topological_computations import get_axes_ratios
 
 def test_fit_ellipsoid():
@@ -183,7 +186,7 @@ def test_generate_ellipsoid_simplex_tree4():
     for splx in simplex_list:
         simplex_tree_target.insert(splx[0], filtration=splx[1])
 
-    simplex_tree = generateEllipsoidSimplexTree4(points, nbhd_size, axes_ratios)
+    simplex_tree = generate_ellipsoid_simplex_tree(points, nbhd_size, axes_ratios)
     # printListOfSimplices(simplex_tree_target)
     # printListOfSimplices(simplex_tree[0])
 
@@ -325,3 +328,11 @@ def test_spherisize_by_filtration():
         spherisize_axes(axes_lengths_1, r_1_3, r_spherisize=spherisize_filtration_1),
         target_axes_lengths_1_3
         )
+
+
+def test_adjacent_delaunay_vertices():
+    points = np.array([[0, 0], [1, 0], [1, 1], [0, 1], [0.5, 0.5]])
+    vertex_index = 0
+    delaunay = Delaunay(points)
+    adjacent_vertices = adjacent_delaunay_vertices(delaunay, vertex_index)
+    assert adjacent_vertices == [1,3,4]

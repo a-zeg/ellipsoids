@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath('.'))
 
 from ellipsoids.topological_computations import calculate_ellipsoid_barcode
 from ellipsoids.topological_computations import calculate_rips_barcode
-from ellipsoids.topological_computations import reduceBarcode
+from ellipsoids.topological_computations import reduce_barcode
 from ellipsoids.data_handling import set_filename_parameters
 from ellipsoids.data_handling import generate_filename
 from ellipsoids.data_handling import save_variables
@@ -76,11 +76,11 @@ def plot_from_file(folder):
         ax_bar_E = fig.add_subplot(121)
         ax_bar_R = fig.add_subplot(122) 
 
-        reduced_barcode_ellipsoids, maxBarEndEllipsoids = reduceBarcode( \
+        reduced_barcode_ellipsoids, maxBarEndEllipsoids = reduce_barcode( \
                             barcode_ellipsoids, \
                             nBarsDim0=n_bars_dim0, \
                             nBarsDim1=n_bars_dim1)
-        reduced_barcode_rips, maxBarEndRips = reduceBarcode( \
+        reduced_barcode_rips, maxBarEndRips = reduce_barcode( \
                                     barcode_rips, \
                                     nBarsDim0=n_bars_dim0, \
                                     nBarsDim1=n_bars_dim1)
@@ -112,4 +112,4 @@ if __name__ == '__main__':
     # calculate_ellipsoid_complex(datasets_folder, output_folder)
 
     ## uncomment for plotting:
-    plot_from_file(output_folder) 
+    plot_from_file(output_folder)

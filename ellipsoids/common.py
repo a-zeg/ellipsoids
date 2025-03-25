@@ -3,9 +3,11 @@ from enum import Enum
 from typing import Optional
 from datetime import datetime
 import json
+import os
 
 import numpy as np
 import gudhi as gd
+
 
 
 
@@ -71,8 +73,8 @@ class Dataset:
 
     def to_dict(self) -> dict:
         return {
-            "points": self.points.tolist(),
             "data_type": self.data_type,
+            "points": self.points.tolist(),
         }
 
     @classmethod
@@ -83,8 +85,8 @@ class Dataset:
 
 
 class ComplexType(Enum):
-    BALL = "ball"
-    ELLIPSOID = "ellipsoid"
+    BALL = "BALL"
+    ELLIPSOID = "ELLIPSOID"
 
     def __str__(self):
         return self.name.upper()
@@ -92,8 +94,8 @@ class ComplexType(Enum):
 
 
 class ComplexSubtype(Enum):
-    RIPS = "rips"
-    ALPHA = "alpha"
+    RIPS = "RIPS"
+    ALPHA = "ALPHA"
 
     def __str__(self):
         return self.name.title()
@@ -184,6 +186,7 @@ class Results:
     execution_time: Optional[float] = None
 
     def to_dict(self):
+        # return {key: value for key, value in vars(self).items() if value not in (None, [], {})}
         return {
             "barcode": self.barcode,
             "simplex_tree": self.simplex_tree,
@@ -255,12 +258,15 @@ class PlotParameters:
 
 
 
+
+
 class Experiment:
     def __init__(self, dataset: Dataset, parameters: Parameters):
         self.dataset = dataset
         self.parameters = parameters
         self.results: Results = Results()
         self.plot_parameters: PlotParameters = PlotParameters()
+        # self.turkevs_parameters: Optional[TurkevsParameters] = None
 
     def run(self):
         from ellipsoids.topological_computations import calculate_rips
@@ -276,25 +282,68 @@ class Experiment:
 
     def print_execution_time(self):
         if self.results is None:
-            raise RuntimeError(f"Experiment with parameters {self.parameters} has not been run yet.")
-
+            raise RuntimeError(f"Experiment with parameters {self.parameters} has not been run yet, no execution time to print.")
         print(f"Execution time of {self.parameters.complex_type}-{self.parameters.complex_subtype} is {self.results.execution_time}")
 
-    def _generate_filename(self):
-       filename = f"{self.dataset.data_type}-{self.dataset.n_points}_{self.parameters.complex_type}-{self.parameters.complex_type}"
-       timestamp = datetime.now().strftime("_%Y%m%d_%H%M%S")
-       filename = f"{filename}__{timestamp}"
+    def _generate_filename(self, add_timestamp=True):
+       filename = f"{self.dataset.data_type}-{self.dataset.n_points()}_{self.parameters.complex_type}-{self.parameters.complex_subtype}"
+       if add_timestamp:
+           timestamp = datetime.now().strftime("%Y%m%d_%H%M%S%f")
+           filename = f"{filename}__{timestamp}"
+       return filename
 
-    def save_to_json(self):
-        '''old way'''
-        pass
+    def to_dict(self):
+        experiment_data = {
+            'dataset': self.dataset.to_dict(),
+            'parameters': self.parameters.to_dict(),
+            'results': self.results.to_dict(),
+        }
+        return experiment_data
+
+    def _generate_filepath(self, folder, filename):
+        from ellipsoids.data_handling import ensure_folder_exists
+        ensure_folder_exists(folder)
+        if filename is None:
+            filename = f"{self._generate_filename()}.json"
+        return os.path.join(folder, filename)
 
 
-    def save_to_hdf5(self):
-        ''' Save'''
-        ''' either save in hdf5 or in json '''
-        pass
+    def save_to_json(self, folder="data", filename=None):
+        from ellipsoids.data_handling import CustomEncoder
 
+        if not self.results:
+            raise RuntimeError("Experiment has not been run yet, no results to save.")
+
+        if filename == None:
+            filename = self._generate_filename()
+
+        experiment_dict = self.to_dict()
+        json_string = json.dumps(experiment_dict, cls=CustomEncoder, indent=4)
+
+        filepath = self._generate_filepath(folder, filename)
+        if not filepath.endswith('.json'):
+            filepath = f"{filepath}.json"
+
+        with open(filepath, 'w') as outfile:
+            outfile.write(json_string)
+        print(f"Experiment data saved to {filepath}")
 
     def get_results(self):
         return self.results
+
+    @classmethod
+    def read_from_json(cls, filename: str):
+        from ellipsoids.data_handling import read_variables
+        json_dict = read_variables(filename)
+        return cls.from_dict(json_dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Experiment":
+        dataset = Dataset.from_dict(data["dataset"])
+        parameters = Parameters.from_dict(data["parameters"])
+        results = Results.from_dict(data["results"])
+        # plot_parameters = PlotParameters.from_dict(data["plot_parameters"])
+
+        experiment = cls(dataset, parameters)
+        experiment.results = results
+        return experiment

@@ -9,10 +9,10 @@ sys.path.append(os.path.abspath('.'))
 
 from ellipsoids.topological_computations import calculate_ellipsoid_barcode
 from ellipsoids.topological_computations import calculate_rips_barcode
-from ellipsoids.topological_computations import reduceBarcode
+from ellipsoids.topological_computations import reduce_barcode
 from ellipsoids.data_handling import set_filename_parameters
 from ellipsoids.data_handling import generate_filename
-from ellipsoids.data_handling import figure_eight
+from ellipsoids.data_handling import sample_from_figure_eight
 from ellipsoids.data_handling import save_variables
 from ellipsoids.data_handling import read_variables
 from ellipsoids.visualisation import plot_ellipses
@@ -34,7 +34,7 @@ def calculate_ellipsoid_and_rips_complexes():
     filename_parameters = set_filename_parameters(data_type, n_pts, nbhd_size, axes_ratios, data_type_params)
     save_filename = generate_filename(filename_parameters, folder=output_folder)
 
-    points = figure_eight(n_pts, 2, 0.5, variation=0.05)
+    points = sample_from_figure_eight(n_pts, 2, 0.5, variation=0.05)
 
     barcode_ellipsoids, simplex_tree_ellipsoids, ellipsoid_list, _ = calculate_ellipsoid_barcode(points, nbhd_size, axes_ratios, expansion_dim=expansion_dim)
     barcode_rips, simplex_tree_rips, _ = calculate_rips_barcode(points, expansion_dim=expansion_dim)
@@ -93,11 +93,11 @@ def plot_from_file(filename, r_plot=0.2):
 
 
 
-    reduced_barcode_ellipsoids, maxBarEndEllipsoids = reduceBarcode( \
+    reduced_barcode_ellipsoids, maxBarEndEllipsoids = reduce_barcode( \
                         barcode_ellipsoids, \
                         nBarsDim0=n_bars_dim0, \
                         nBarsDim1=n_bars_dim1)
-    reduced_barcode_rips, maxBarEndRips = reduceBarcode( \
+    reduced_barcode_rips, maxBarEndRips = reduce_barcode( \
                                 barcode_rips, \
                                 nBarsDim0=n_bars_dim0, \
                                 nBarsDim1=n_bars_dim1)

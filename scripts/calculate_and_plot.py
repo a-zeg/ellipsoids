@@ -9,10 +9,10 @@ sys.path.append(os.path.abspath('.'))
 
 from ellipsoids.topological_computations import calculate_ellipsoid_barcode
 from ellipsoids.topological_computations import calculate_rips_barcode
-from ellipsoids.topological_computations import reduceBarcode
+from ellipsoids.topological_computations import reduce_barcode
 from ellipsoids.data_handling import set_filename_parameters
 from ellipsoids.data_handling import generate_filename
-from ellipsoids.data_handling import figure_eight
+from ellipsoids.data_handling import sample_from_figure_eight
 from ellipsoids.data_handling import sample_from_circle
 from ellipsoids.data_handling import sample_from_sphere
 from ellipsoids.data_handling import save_variables
@@ -32,7 +32,7 @@ def calculate_ellipsoid_complex(data_type: str):
     if data_type == 'figure_eight':
         a = 2
         b = 0.5
-        points = figure_eight(n,a,b,variation=0.05)
+        points = sample_from_figure_eight(n,a,b,variation=0.05)
     elif data_type == 'circle':
         points = sample_from_circle(n_pts=n)
     elif data_type == 'sphere':
@@ -111,11 +111,11 @@ def plot_from_file(filename, r_plot=0.2):
 
 
 
-    reduced_barcode_ellipsoids, maxBarEndEllipsoids = reduceBarcode( \
+    reduced_barcode_ellipsoids, maxBarEndEllipsoids = reduce_barcode( \
                         barcode_ellipsoids, \
                         nBarsDim0=n_bars_dim0, \
                         nBarsDim1=n_bars_dim1)
-    reduced_barcode_rips, maxBarEndRips = reduceBarcode( \
+    reduced_barcode_rips, maxBarEndRips = reduce_barcode( \
                                 barcode_rips, \
                                 nBarsDim0=n_bars_dim0, \
                                 nBarsDim1=n_bars_dim1)

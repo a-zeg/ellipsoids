@@ -8,7 +8,7 @@ from scipy.io import savemat
 from ellipsoids.data_handling import savemat
 from ellipsoids.data_handling import sample_from_circle
 from ellipsoids.data_handling import sample_from_sphere
-from ellipsoids.data_handling import figure_eight
+from ellipsoids.data_handling import sample_from_figure_eight
 from ellipsoids.data_handling import sample_from_annulus
 
 
@@ -29,7 +29,7 @@ filename = 'sphere' + '_' + f'{n_pts=}' + '.mat'
 savemat(os.path.join(folder,filename), vars)
 
 # figure_eight:
-points = figure_eight(n_pts, 1, 0.1)
+points = sample_from_figure_eight(n_pts, 1, 0.1)
 vars = { 'points': points }
 filename = 'figure_eight' + '_' + f'{n_pts=}' + '.mat'
 savemat(os.path.join(folder,filename), vars)

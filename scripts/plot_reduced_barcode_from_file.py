@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath('.'))
 
 from ellipsoids.visualisation import plot_barcode
-from ellipsoids.topological_computations import reduceBarcode
+from ellipsoids.topological_computations import reduce_barcode
 from ellipsoids.data_handling import read_variables
 
 ###### User input ######
@@ -35,12 +35,12 @@ vars = read_variables(filename)
 barcodeEllipsoids = vars['barcode_ellipsoids']
 barcodeRips = vars['barcode_rips']
 
-reducedBarcodeEllipsoids, maxBarEndEllipsoids = reduceBarcode( \
+reducedBarcodeEllipsoids, maxBarEndEllipsoids = reduce_barcode( \
                             barcodeEllipsoids, \
                             nBarsDim0=nBarsDim0, \
                             nBarsDim1=nBarsDim1, \
                             nBarsDim2=nBarsDim2)
-reducedBarcodeRips, maxBarEndRips = reduceBarcode( \
+reducedBarcodeRips, maxBarEndRips = reduce_barcode( \
                             barcodeRips, \
                             nBarsDim0=nBarsDim0, \
                             nBarsDim1=nBarsDim1, \
