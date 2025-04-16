@@ -8,6 +8,12 @@
 </div>
 
 
+> [!CAUTION]
+> 
+> This project is currently undergoing a major overhaul. If you're here to explore the code, I recommend checking out the version on the [`v2-beta`](https://github.com/a-zeg/ellipsoids/tree/v2-beta) branch — it should be clearer and easier to use. 
+> 
+> The downside is that the scripts in `ellipsoids/scripts/turkevs`, which are used for running the experiments described in [[3]](#3), are still incomplete in the [`v2-beta`](https://github.com/a-zeg/ellipsoids/tree/v2-beta) version.
+
 <!-- TABLE OF CONTENTS -->
 <details>
   <summary>Table of Contents</summary>
