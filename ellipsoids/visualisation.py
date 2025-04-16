@@ -1,13 +1,17 @@
 import gudhi as gd
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-# from typing import Type
 
 from datetime import datetime
 
+from scipy.spatial import Delaunay
+
 # from ellipsoids.topological_computations import Ellipsoid
-from ellipsoids.data_handling import read_variables
+from ellipsoids.data_handling import read_from_json
+from ellipsoids.data_handling import ensure_folder_exists
+
 from ellipsoids.topological_computations import reduce_barcode
 # from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode, plot_persistence_density
 from gudhi.persistence_graphical_tools import _limit_to_max_intervals, __min_birth_max_death
@@ -20,8 +24,12 @@ from ellipsoids.common import EllipsoidResults
 from ellipsoids.common import Results
 from ellipsoids.common import Dataset
 from ellipsoids.common import Experiment
+from ellipsoids.common import ComplexType
+from ellipsoids.common import ComplexSubtype
 from typing import Optional
 from dataclasses import dataclass
+from ellipsoids.common import ConversionType
+from ellipsoids.common import convert
 
 
 def plot_ellipse(ellipse: Ellipsoid, color='grey', r:float=1, axes=None, r_spherisize:float=np.inf):
@@ -32,10 +40,9 @@ def plot_ellipse(ellipse: Ellipsoid, color='grey', r:float=1, axes=None, r_spher
     yTemp = r*spherisized_axes[1]*np.sin(t)
     x = ellipse.center[0] + ellipse.axes[0,0]*xTemp + ellipse.axes[1,0]*yTemp
     y = ellipse.center[1] + ellipse.axes[0,1]*xTemp + ellipse.axes[1,1]*yTemp
-    if axes is None:
-        plt.plot(x,y,c=color)
-    else:
-        axes.plot(x,y,c=color)
+
+    plot_context = axes if axes is not None else plt
+    plot_context.plot(x,y,c=color, alpha=0.5)
 
 
 
@@ -64,10 +71,8 @@ def plot_ellipsoid(ellipsoid: Ellipsoid, color='grey', r:float=1, axes=None):
     y = np.reshape(allTransformed[1,:],(100,100)) + ellipsoid.center[1]
     z = np.reshape(allTransformed[2,:],(100,100)) + ellipsoid.center[2]
 
-    if axes is None:
-        plt.plot_surface(x,y,z, rstride=4, cstride=4, color=color, alpha = 0.2)
-    else:
-        axes.plot_surface(x,y,z, rstride=4, cstride=4, color=color, alpha = 0.2)
+    plot_context = axes if axes is not None else plt
+    plot_context.plot_surface(x,y,z, rstride=4, cstride=4, color=color, alpha = 0.2)
 
 
 
@@ -83,69 +88,59 @@ def plot_ellipsoids(ellipsoid_list, r, axes=None):
 
 
 
-def plotCircle(point, r=1, color='grey', axes=None):
+def plot_circle(point, r=1, color='grey', axes=None):
     sample_rate = 100
     t = np.linspace(0, 2*np.pi, sample_rate)
     x = point[0] + r*np.cos(t)
     y = point[1] + r*np.sin(t)
-    if axes is None:
-        plt.plot(x,y,c=color)
-    else:
-        axes.plot(x,y,c=color)
+
+    plot_context = axes if axes is not None else plt
+    plot_context.plot(x,y,c=color, alpha=0.5)
 
 
 
-def plotCircles(points, r=1, axes=None):
+def plot_circles(points, r=1, axes=None):
     for point in points:
-        plotCircle(point, r=r, axes=axes)
+        plot_circle(point, r=r, axes=axes)
 
 
 
-def plot_simplex_tree(points, simplexTree, r, axes):
+def plot_simplex_tree(points: np.ndarray,
+                      simplexTree: gd.SimplexTree,
+                      filtration: float,
+                      axes: plt.Axes,
+                      simplex_color='r'):
     dim = len(points[0])
     if dim > 3:
-        raise Exception('Error: Attempting to plot simplex tree in dimension higher than 3.')
-    generator = simplexTree.get_filtration()
-    simplexList = list(generator)
+        raise ValueError('Error: Attempting to plot simplex tree in dimension higher than 3.')
 
-    if axes is None:
-        for splx in simplexList:
-            if splx[1] <= r:
-                vertices = splx[0]
-                match len(vertices):
-                    case 1:
-                        plt.scatter(*np.transpose(points[vertices]), c='k', zorder=100)
-                        # points[vertices] gives us points forming the vertices of the simplex
-                        # transposing them and taking the * operator returns x-, y-. and z-coords separately
-                    case 2:
-                        plt.plot(*np.transpose(points[vertices]), c='r')
-                    case 3:
-                        if dim == 2:
-                            plt.fill(*np.transpose(points[vertices]), c='r', alpha=0.1)
-    else:
-        idx = 1
-        for splx in simplexList:
-            idx = idx + 1
-            
-            # if splx[1] <= r:
-            if splx[1] <= 2*r: # alt20230927_2: 2r so that it's comparable to Rips
-                vertices = splx[0]
-                match len(vertices):
-                    case 1:
-                        axes.scatter(*np.transpose(points[vertices]), c='k', zorder=100)
-                    case 2:
-                        axes.plot(*np.transpose(points[vertices]), c='r')
-                    case 3:
-                        if dim == 2:
-                            axes.fill(*np.transpose(points[vertices]), c='r', alpha=0.1)
+    filtered_simplex_list = list(simplexTree.get_filtration())
+    plot_context = axes if axes is not None else plt
+
+    for simplex, simplex_filtration in filtered_simplex_list:
+        if simplex_filtration > filtration: continue
+
+        coordinates = np.transpose(points[simplex])
+        match len(simplex):
+            case 1:
+                plot_context.scatter(*coordinates, c='k', zorder=100)
+            case 2:
+                plot_context.plot(*coordinates, c=simplex_color)
+            case 3:
+                if dim == 2:
+                    plot_context.fill(*coordinates, c=simplex_color, alpha=0.1)
 
 
 
 def plot_data_points(points, axes=None):
-    if axes is None:
-        plt.scatter(points[:,0],points[:,1])
-    else:
-        axes.scatter(points[:,0],points[:,1])
+    plot_context = axes if axes is not None else plt
+    if len(points[0]) == 2:
+        plot_context.scatter(points[:,0],points[:,1])
+    elif len(points[0]) == 3:
+        plot_context.scatter(points[:,0],points[:,1],points[:,2])
+        # plot_context.remove()
+        # TODO figure this out!
+
 
 
 
@@ -291,12 +286,6 @@ def quick_dim_to_bars(n_bars_list: list[int]) -> dict:
 
 
 def reduce_barcode_descending(barcode: list[tuple], dim_to_bars: dict):
-    """
-    barcode is a barcode
-    dim_to_bars is a dictionary with key dim and bars the number of bars in this dimension
-
-    returns: in each dimension n, dim_to_bars[n] longest bars in that dimension
-    """
     reduced_barcode = []
 
     for dim, n_bars in dim_to_bars.items():
@@ -309,15 +298,12 @@ def reduce_barcode_descending(barcode: list[tuple], dim_to_bars: dict):
 
 
 def find_max_end(barcode, length_tolerance=0.1):
-
     max = -np.inf
-
     for bar in barcode:
         bar_end = bar[1][1]
         bar_length = bar_end - bar[1][0]
         if bar_end != np.inf and bar_length > length_tolerance and bar_end > max:
             max = bar_end
-
     return max
 
 
@@ -345,13 +331,59 @@ def ax_title_barcode(experiment: Experiment):
 def ax_title_plot(experiment: Experiment):
     plot_parameters = experiment.plot_parameters
 
-    return f"r={plot_parameters.r}"
+    return f"filtration={plot_parameters.filtration}"
+
+
+
+def plot_delaunay_triangulation(points, axes):
+    plot_context = axes if axes is not None else plt
+    triangulation = Delaunay(points)
+    plot_context.triplot(points[:,0], points[:,1], triangulation.simplices, color='b', alpha=0.3)
+
+
+def plot_spatial_data(experiment, ax_plot):
+    """Helper function to plot data points, ellipsoids, and simplex tree."""
+    plot_parameters = experiment.plot_parameters
+    parameters = experiment.parameters
+    dataset = experiment.dataset
+    results = experiment.results
+
+    if ax_plot is not None:
+        ax_plot.set_aspect('equal')
+        ax_plot.set_title(ax_title_plot(experiment))
+
+    if plot_parameters.draw_points:
+        plot_data_points(dataset.points, axes=ax_plot)
+    if plot_parameters.draw_ellipsoids:
+
+        filtration = plot_parameters.filtration
+        if parameters.complex_subtype == ComplexSubtype.RIPS:
+            radius = convert(filtration, ConversionType.RIPS_TO_RADIUS)
+        elif parameters.complex_subtype == ComplexSubtype.ALPHA:
+            radius = convert(filtration, ConversionType.ALPHA_TO_RADIUS)
+        else:
+            radius = filtration
+
+        if isinstance(results, EllipsoidResults):
+            plot_ellipses(results.ellipsoid_list,
+                          radius,
+                          axes=ax_plot,
+                          r_spherisize=parameters.r_spherisize)
+        else:
+            plot_circles(dataset.points, r=radius, axes=ax_plot)
+    if plot_parameters.draw_simplex_tree:
+        plot_simplex_tree(dataset.points, results.simplex_tree, plot_parameters.filtration, axes=ax_plot)
+
+    if parameters.complex_type == ComplexType.ELLIPSOID \
+       and parameters.complex_subtype == ComplexSubtype.ALPHA:
+        plot_delaunay_triangulation(dataset.points, ax_plot)
 
 
 
 def plot_experiment(experiment: Experiment,
-         ax_barcode: Optional[plt.Axes] = None,
-         ax_plot: Optional[plt.Axes] = None):
+                    ax_barcode: Optional[plt.Axes] = None,
+                    ax_plot: Optional[plt.Axes] = None,
+                    show=True):
 
     results = experiment.results
     parameters = experiment.parameters
@@ -359,37 +391,38 @@ def plot_experiment(experiment: Experiment,
     dataset = experiment.dataset
 
     if ax_barcode == None and ax_plot == None:
-        fig, [ax_barcode, ax_plot] = plt.subplots(1, 2, figsize=(15, 7))
+        n_axes_per_experiment = 1 + should_plot_spatial_data([experiment])
+        fig, axes = plt.subplots(1, n_axes_per_experiment)
+        fig.set_size_inches(4*n_axes_per_experiment, 2)
 
-    # Plot the barcode
+        if n_axes_per_experiment == 1:
+            ax_barcode = axes
+            ax_plot = None
+        else:
+            ax_barcode = axes[-1]
+            ax_plot = axes[0]
+
     reduced_barcode = reduce_barcode_descending(results.barcode, plot_parameters.n_bars)
     plot_barcode(reduced_barcode,
                  axes=ax_barcode,
                  infinity=plot_parameters.x_axis_end,
                  axis_start=plot_parameters.x_axis_start)
     ax_barcode.set_title(ax_title_barcode(experiment))
-        # f"Barcode of {parameters.complex_type} - {parameters.complex_subtype}")
+    ax_barcode.set_xlabel("Filtration")
+    ax_barcode.set_ylabel("(Filtered) barcode")
 
-    # maybe plot the points
-    if plot_parameters.draw_points \
-       or plot_parameters.draw_ellipsoids \
-       or plot_parameters.draw_simplex_tree:
 
-        plot_data_points(dataset.points, axes=ax_plot)
-        ax_plot.set_aspect('equal')
-        ax_plot.set_title(ax_title_plot(experiment))
+    if should_plot_spatial_data([experiment]):
+        plot_spatial_data(experiment, ax_plot=ax_plot)
 
-        if plot_parameters.draw_ellipsoids and isinstance(results, EllipsoidResults):
-            # scale axes appropriately, depending on r_spherisize
-            plot_ellipses(results.ellipsoid_list, plot_parameters.r, axes=ax_plot, r_spherisize=experiment.parameters.r_spherisize)
-
-        if plot_parameters.draw_simplex_tree:
-            plot_simplex_tree(dataset.points, results.simplex_tree, plot_parameters.r, axes=ax_plot)
+    if show:
+        plt.tight_layout()
+        plt.subplots_adjust(hspace=0.6)
+        plt.show()
 
 
 
-
-def should_draw_experiments(experiments: list[Experiment]):
+def should_plot_spatial_data(experiments: list[Experiment]):
     draw_experiment = False
     for experiment in experiments:
         plot_parameters = experiment.plot_parameters
@@ -403,10 +436,22 @@ def should_draw_experiments(experiments: list[Experiment]):
 
 
 
-def plot_experiments(experiments: list[Experiment]):
+def save_figure(figure, path: Optional[str] = None):
+
+    if path == None:
+        ensure_folder_exists("data")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = os.path.join("data", f"figure_{timestamp}.png")
+
+    figure.savefig(path, dpi=300)
+    print(f"Figure saved to {path}.")
+
+
+
+def plot_experiments(experiments: list[Experiment], save_plot: bool = False):
 
     n_experiments = len(experiments)
-    n_axes_per_experiment = 1 + should_draw_experiments(experiments)
+    n_axes_per_experiment = 1 + should_plot_spatial_data(experiments)
     fig, axes = plt.subplots(n_experiments,
                              n_axes_per_experiment)
                              # figsize=(n_axes_per_experiment*5, n_experiments * 5))
@@ -428,9 +473,10 @@ def plot_experiments(experiments: list[Experiment]):
                 ax_draw = axes[i][0]
 
         experiment.plot_parameters.x_axis_end = x_axis_end
-        plot_experiment(experiment, ax_barcode=ax_barcode, ax_plot=ax_draw)
+        plot_experiment(experiment, ax_barcode=ax_barcode, ax_plot=ax_draw, show=False)
 
         print("Done.")
+
 
     print("Done.")
 
@@ -439,54 +485,5 @@ def plot_experiments(experiments: list[Experiment]):
     fig.set_size_inches(4*n_axes_per_experiment, 2*n_experiments)
     plt.show()
 
-
-
-def plot_results(results_list: list[Results],
-                 params_list: list[Parameters],
-                 dataset: Dataset,
-                 r: float = 1,
-                 draw_ellipsoids: bool = False,
-                 draw_simplex_tree: bool = False):
-
-    print("Plotting results...")
-
-    num_datasets = len(results_list)
-    num_plots_per_dataset = 1 + (draw_ellipsoids or draw_simplex_tree)
-    fig, axes = plt.subplots(num_datasets,
-                             num_plots_per_dataset,
-                             figsize=(15, num_datasets * 5))  # 3 subplots per dataset
-
-    list_barcodes, max_length = calculate_barcodes(results_list)
-
-    for i, results in enumerate(results_list):
-        print(f"Generating plot for dataset {i} of {num_datasets}... ", end='', flush=True)
-
-        # Plot the barcode
-        if num_plots_per_dataset == 1:
-            ax = axes[i]
-        else:
-            ax = axes[i][-1]
-        plot_barcode(list_barcodes[i], axes=ax, infinity=max_length, axis_start=-0.1)
-        ax.set_title(f"Barcode of {params_list[i].complex_type} - {params_list[i].complex_subtype}")
-
-        # maybe plot the points
-        if num_plots_per_dataset > 1:
-            plot_data_points(dataset.points, axes=axes[i,0])
-            axes[i][0].set_aspect('equal')
-
-            print(type(results))
-
-            if draw_ellipsoids and isinstance(results, EllipsoidResults):
-                plot_ellipses(results.ellipsoid_list, r, axes=axes[i][0])
-
-            if draw_simplex_tree:
-                plot_simplex_tree(dataset.points, results.simplex_tree, r, axes=axes[i,0])
-
-        print("Done.")
-
-    print("Done.")
-
-    plt.tight_layout()
-    plt.show()
-
-
+    if save_plot:
+        save_figure(fig)

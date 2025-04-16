@@ -5,7 +5,7 @@ import copy
 from scipy.spatial import Delaunay, Voronoi
 
 from ellipsoids.topological_computations import fit_ellipsoid, spherisize_axes
-from ellipsoids.topological_computations import generate_ellipsoid_simplex_tree
+from ellipsoids.topological_computations import generate_ELLIPSOID_RIPS_simplex_tree
 from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.topological_computations import find_intersection_radius
 from ellipsoids.topological_computations import get_max_axes_ratio
@@ -186,7 +186,7 @@ def test_generate_ellipsoid_simplex_tree4():
     for splx in simplex_list:
         simplex_tree_target.insert(splx[0], filtration=splx[1])
 
-    simplex_tree = generate_ellipsoid_simplex_tree(points, nbhd_size, axes_ratios)
+    simplex_tree = generate_ELLIPSOID_RIPS_simplex_tree(points, nbhd_size, axes_ratios)
     # printListOfSimplices(simplex_tree_target)
     # printListOfSimplices(simplex_tree[0])
 

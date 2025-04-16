@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 import pickle
 import gudhi as gd
@@ -17,14 +18,15 @@ from scipy.io import savemat
 
 sys.path.append(os.path.abspath('.'))
 
-from ellipsoids.topological_computations import calculate_ellipsoid_barcode
-from ellipsoids.topological_computations import calculate_rips_barcode
-from ellipsoids.topological_computations import calculate_barcode
+# from ellipsoids.topological_computations import calculate_ellipsoid_barcode
+# from ellipsoids.topological_computations import calculate_rips_barcode
+# from ellipsoids.topological_computations import calculate_barcode
 
 
-from ellipsoids.common import Ellipsoid
+from ellipsoids.common import Ellipsoid, TurkevsDatasetInfo
 from ellipsoids.common import Dataset
 from ellipsoids.common import EllipsoidParameters
+from ellipsoids.common import ComplexType
 from ellipsoids.common import ComplexSubtype
 from ellipsoids.common import Results
 
@@ -105,7 +107,7 @@ def sample_from_torus(n_pts: int = 100, R: float = 2, r: float = 1):
 
 
 
-def sample_from_figure_eight(n: int, a: float, b: float, variation: float = 0):
+def sample_from_figure_eight(n: int, a: float = 1, b: float = 0.5, variation: float = 0):
     # adapted from Bastian Rieck
     """Sample a set of points from a figure eight curve.
 
@@ -127,7 +129,9 @@ def sample_from_figure_eight(n: int, a: float, b: float, variation: float = 0):
     np.array
         Array of shape (n, 2). Will contain the sampled points.
     """
-    T = np.linspace(-3.14, 3.14, num=n)
+    start_T = -np.pi
+    end_T = np.pi - (2*np.pi / n) # correcting for periodicity (don't want two points at np.pi (i.e. -np.pi))
+    T = np.linspace(start_T, end_T, num=n)
 
     X = a * np.sin(T)
     Y = a * np.sin(T)**2 * np.cos(T) + b * np.cos(T)
@@ -242,30 +246,29 @@ def ensure_folder_exists(filename):
     and creates it if it does not.
     """
     folder = os.path.dirname(filename)
-
     if folder and not os.path.exists(folder):
-        os.makedirs(folder)
+        os.makedirs(folder, exist_ok=True)
 
 
-def save_variables(
-        dictOfVars,
-        filename=datetime.now().strftime("data/test.json"), 
-        timestamp=True):
+def save_to_json(
+        data: Any,
+        filename: str = os.path.join("data","test"),
+        add_timestamp: bool = True):
     
-    print('Saving data to file...')
+    print("Saving data...")
 
-    if timestamp:
-        filename = filename + '_' + get_timestamp()
+    if not filename.endswith(".json"):
+        filename = filename + ".json"
 
-    if not filename.endswith('.json'):
-        filename = filename + '.json'
+    if add_timestamp:
+        filename = filename.replace(".json", f"_{get_timestamp()}.json")
 
     ensure_folder_exists(filename);
 
-    json_string = json.dumps(dictOfVars, cls=CustomEncoder, indent=4)
+    json_string = json.dumps(data, cls=CustomEncoder, indent=2)
     with open(filename, 'w') as outfile:
         outfile.write(json_string)
-    print("Data saved to file " + filename + '.')
+    print(f"Data saved to {filename}.")
 
     return filename
 
@@ -298,7 +301,7 @@ def continuously_save_variables(
 
 
 
-def read_variables(filename):
+def read_from_json(filename):
     with open(filename, "r") as f:
         json_vars = json.load(f)
     
@@ -498,13 +501,13 @@ def calculate_and_save_ellipsoids_and_rips_data(points, nbhd_size, axes_ratios, 
         for key, value in additional_vars_dict.items():
             params_dict[key] = value
     
-    save_variables(params_dict, filename=filename)
+    save_to_json(params_dict, filename=filename)
 
 
 
 def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
     print('Reading in the variables... ', end='', flush=True)
-    vars = read_variables(filename)
+    vars = read_from_json(filename)
     if 'expansionDim' in vars and vars['expansionDim'] == expansionDim:
         print('The original barcode is already expanded to the specified dimension.')
         return None
@@ -527,9 +530,22 @@ def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
     }
 
     filename =  filename[:filename.rfind('.')] + '-barcodes_expansionDim=' + f'{expansionDim}' + datetime.now().strftime("_%Y%m%d_%H%M%S") + '.json'
-    save_variables(dictOfVars, filename=filename)
+    save_to_json(dictOfVars, filename=filename)
 
 
+
+def prompt_before_overwrite(folder_path: str) -> bool:
+    if os.path.exists(folder_path):
+        print(f"Folder '{folder_path}' already exists.")
+        print("Files in this folder may be overwritten.")
+
+        response = input("Do you want to continue anyway? [y/N]: ").strip().lower()
+
+        if response not in ('y', 'yes'):
+            print("Operation cancelled by user.")
+            return False
+
+    return True
 
 
 ############################################
@@ -538,8 +554,270 @@ def recalculateBarcodesFromFile(filename, expansionDim=2, collapseEdges=False):
 # The rest of this file consists of functions specific to 
 # handling the turkevs data.
 
+
+from ellipsoids.turkevs.data_construction import build_dataset_holes
+from ellipsoids.turkevs.data_construction import calculate_point_clouds_under_trnsf
+from ellipsoids.common import TurkevsTransformation
+
+
+
+def generate_turkevs_datasets(n_point_clouds: int,
+                              n_points: int,
+                              seed: int,
+                              folder=os.path.join("datasets","turkevs"),
+                              save_to_file=True):
+
+    np.random.seed(seed)
+    print("\n\nConstructing the data...")
+
+    initial_point_clouds, labels, _ = build_dataset_holes(n_point_clouds, n_points)
+    all_datasets: list[Dataset] = []
+
+    dataset_id = None
+    if save_to_file:
+        dataset_id = generate_dataset_id(folder)
+
+    for transformation in TurkevsTransformation:
+        print(f"Applying transformation: {transformation.fullname}.")
+        transformed_point_clouds = (
+            initial_point_clouds if transformation is TurkevsTransformation.STANDARD
+            else calculate_point_clouds_under_trnsf(initial_point_clouds,
+                                                    transformation=transformation.fullname)
+        )
+
+        for mesh_index, (points,label) in enumerate(zip(transformed_point_clouds, labels)):
+            dataset = Dataset(
+                points=points,
+                data_type="turkevs",
+                additional_info=TurkevsDatasetInfo(
+                    dataset_id=dataset_id,
+                    seed=seed,
+                    mesh_index=mesh_index,
+                    transformation=transformation,
+                    label=label,
+                )
+            )
+            all_datasets.append(dataset)
+
+    if save_to_file:
+        filename =  f"turkevs_datasets_{n_point_clouds=}_{n_points=}_seed={seed}_id={dataset_id}"
+        filepath = os.path.join(folder, filename)
+        save_to_json([d.to_dict() for d in all_datasets], filename=filepath, add_timestamp=False)
+
+    return all_datasets
+
+
+
+def format_dataset_id(id: int):
+    return str(id).zfill(4)
+
+
+
+def generate_dataset_id(folderpath):
+    '''
+    The datasets used in the Turkevs holes tests are generated using the code from the paper and saved in a json file.
+    To keep track of which datasets correspond to which data / graphs, 'id' is introduced.
+
+    This function checks the ids of all the dataset files in the given folder and returns the next available one.
+    '''
+    if not os.path.exists(folderpath):
+        return format_dataset_id(0)
+    paths = get_paths_of_files_in_a_folder(folderpath, extension='pkl') \
+        + get_paths_of_files_in_a_folder(folderpath, extension='json')
+    existing_ids = set()
+
+    # add all ids to existing_ids
+    for path in paths:
+        match = re.search(r'id=(\d+)', path)
+        if match:
+            try:
+                current_id = int(match.group(1))
+                existing_ids.add(current_id)
+            except ValueError:
+                continue
+
+    # find a new id
+    new_id = 0
+    while new_id in existing_ids:
+        new_id += 1
+
+    return format_dataset_id(new_id)
+
+
+
+
+def get_turkevs_dataset_id(path: str):
+    match = re.search(r'id=(\d+)', path)
+    if match:
+        return str(match.group(1))
+    raise ValueError(f"Dataset ID could not be found in the path: {path}")
+
+
+
+@dataclass
+class turkevs_barcode():
+    barcode: list
+    type: str
+    complex_type: ComplexType
+    complex_subtype: ComplexSubtype
+
+
+def filter_barcode(barcode, dim):
+    filtered_barcode = []
+    for bar in barcode:
+        if bar[0] == dim:
+            filtered_barcode.append(bar)
+    return filtered_barcode
+
+
+
+# def create_a_signature(folder: str, parameters: Parameters):
+
+#     extension = '.json'
+#     paths = get_paths_of_files_in_a_folder(folder, extension=extension)
+
+#     number_of_files = len(paths)
+#     print(f"There are {number_of_files} {extension} files found in the folder {folder}.")
+#     if number_of_files == 0:
+#         exit("Folder {folder} does not contain any {extension} files.")
+
+#     # ---------- initialising pds0 and pds1 -----------
+#     # (necessary because the data might be read in a random order and
+#     # it needs to be placed at the correct index)
+
+#     number_of_transformations = len(TurkevsTransformation)
+#     if number_of_files % number_of_transformations != 0:
+#         raise ValueError(f"Error: the number of files in {folder} is not consistent with \
+#                          the number of transformations.")
+#     files_per_transformation = number_of_files // number_of_transformations # integer division
+
+
+#     pass
+
+
+
+def import_turkevs_transformed(folder):
+    '''
+    should import all the stuff in some sort of dataclass dictionary type of variable.
+
+    need just the barcodes
+    '''
+
+    extension = '.json'
+    paths = get_paths_of_files_in_a_folder(folder, extension=extension)
+    number_of_files = len(paths)
+    print(f"There are {number_of_files} {extension} files found in the folder {folder}.")
+    if number_of_files == 0:
+        exit("Folder {folder} does not contain any {extension} files.")
+    transformations = ["std", "trns", "rot", "stretch", "shear", "gauss", "out"]
+
+    # ---------- initialising pds0 and pds1 -----------
+    # (necessary because the data might be read in a random order and
+    # it needs to be placed at the correct index)
+
+    number_of_transformations = len(TurkevsTransformation)
+    if number_of_files % number_of_transformations != 0:
+        raise ValueError(f"Error: the number of files in {folder} is not consistent with \
+                         the number of transformations.")
+    files_per_transformation = number_of_files // number_of_transformations # integer division
+
+
+    # want dictionary with keys transformation and value list of length equal to the number of files for each transformation
+    pdsE0 = {}
+    pdsE1 = {}
+    pdsR0 = {}
+    pdsR1 = {}
+    points = {}
+    labels = [None] * files_per_transformation
+
+    for transformation in transformations:
+        pdsE0[transformation] = [None]*files_per_transformation
+        pdsE1[transformation] = [None]*files_per_transformation
+        pdsR0[transformation] = [None]*files_per_transformation
+        pdsR1[transformation] = [None]*files_per_transformation
+        points[transformation] = [None]*files_per_transformation
+    # --------------------------------------------------
+
+    for path in paths:
+        transformation, index = parse_turkevs_filename(path)
+
+        pdE0, pdE1, pdR0, pdR1, points_, label = read_pd0_and_pd1(path)
+        pdsE0[transformation][index] = pdE0
+        pdsE1[transformation][index] = pdE1
+        pdsR0[transformation][index] = pdR0
+        pdsR1[transformation][index] = pdR1
+        points[transformation][index] = points_
+        labels[index] = label
+
+
+    # -------- Pad to max length ----------
+    max_pdE0_length = []
+    max_pdE1_length = []
+
+    for transformation in transformations:
+
+        # Transform list of 0-dim PDs with different number of cycles into an array of PDs with the same number of cycles.
+        pdsE0_length = [len(pd) for pd in pdsE0[transformation]]
+        max_pdE0_length.append(max(pdsE0_length))
+
+        # Transform list of 1-dim PDs with different number of cycles into an array of PDs with the same number of cycles.
+        pdsE1_length = [len(pd) for pd in pdsE1[transformation]]
+        max_pdE1_length.append(max(pdsE1_length))
+
+    for transformation in transformations:
+        pdsE0[transformation] = extend_pds_to_length(pdsE0[transformation], max(max_pdE0_length))
+        pdsE1[transformation] = extend_pds_to_length(pdsE1[transformation], max(max_pdE1_length))
+    # ------------------------------------
+    # -------- Pad to max length ----------
+    max_pdR0_length = []
+    max_pdR1_length = []
+
+    for transformation in transformations:
+
+        # Transform list of 0-dim PDs with different number of cycles into an array of PDs with the same number of cycles.
+        pdsR0_length = [len(pd) for pd in pdsR0[transformation]]
+        max_pdR0_length.append(max(pdsR0_length))
+
+        # Transform list of 1-dim PDs with different number of cycles into an array of PDs with the same number of cycles.
+        pdsR1_length = [len(pd) for pd in pdsR1[transformation]]
+        max_pdR1_length.append(max(pdsR1_length))
+
+    for transformation in transformations:
+        pdsR0[transformation] = extend_pds_to_length(pdsR0[transformation], max(max_pdR0_length))
+        pdsR1[transformation] = extend_pds_to_length(pdsR1[transformation], max(max_pdR1_length))
+    # ------------------------------------
+
+    labels = np.asarray(labels)
+
+    return pdsE0, pdsE1, pdsR0, pdsR1, points, labels
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#
+#
+#
+#
+#
+#
+#
+#
+#
 # from Turkevs:
 # Transform list of PDs with different number of cycles into an array of PDs with the same number of cycles.
+#
 def extend_pds_to_length(pds, length):
     pds_ext = np.zeros((len(pds), length, 2))
     for s, pd in enumerate(pds):
@@ -682,7 +960,7 @@ def read_pd0_and_pd1(path):
 
 
 
-def import_turkevs_transformed(folder):
+def import_turkevs_transformed_old(folder):
     '''
     Returns three dictionaries: pd0, pd1, and points.
     The keys of each dictionary are the transformations and the values are lists 
@@ -800,5 +1078,3 @@ def find_subfolder_with_given_id(parentfolder, id):
         exit()
     
     return jsondatafolder
-
-
