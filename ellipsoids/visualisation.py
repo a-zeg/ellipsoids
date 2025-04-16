@@ -409,7 +409,7 @@ def plot_experiment(experiment: Experiment,
                  axis_start=plot_parameters.x_axis_start)
     ax_barcode.set_title(ax_title_barcode(experiment))
     ax_barcode.set_xlabel("Filtration")
-    ax_barcode.set_ylabel("(Filtered) barcode")
+    ax_barcode.set_ylabel(f"(Filtered) barcode \n dim : n_bars = {plot_parameters.n_bars}")
 
 
     if should_plot_spatial_data([experiment]):

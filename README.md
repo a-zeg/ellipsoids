@@ -26,7 +26,7 @@
 
 # About the project
 
-![Ellipsoid plots](images/example.png)
+![Ellipsoid plots](images/example_1_plot.png)
 
 This project contains the code used in the paper "Persistent Homology via Ellipsoids" [[1]](#1).
 

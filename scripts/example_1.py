@@ -31,7 +31,7 @@ if __name__ == '__main__':
         experiment.plot_parameters.draw_points = True
         experiment.plot_parameters.draw_ellipsoids = True
         experiment.plot_parameters.draw_simplex_tree = True
-        experiment.plot_parameters.filtration = 0.6
+        experiment.plot_parameters.filtration = 0.7
 
         all_experiments.append(experiment)
 
