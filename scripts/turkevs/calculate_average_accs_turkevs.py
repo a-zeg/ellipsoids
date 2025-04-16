@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath('.'))
 
 from ellipsoids.data_handling import get_paths_of_files_in_a_folder
-from ellipsoids.data_handling import read_variables
-from ellipsoids.data_handling import save_variables
+from ellipsoids.data_handling import read_from_json
+from ellipsoids.data_handling import save_to_json
 from ellipsoids.data_handling import get_timestamp
 from ellipsoids.turkevs.plots import plot_bar_chart
 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     for path in paths:
         accs = {}
-        json_vars = read_variables(path)
+        json_vars = read_from_json(path)
         if 'accs' in json_vars:
             accs = json_vars['accs']
         else:
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     unique_id = id + get_timestamp()
 
     filename_save_vars = os.path.join(path_results,'turkevs_average_' + unique_id)
-    save_variables(vars_to_save, filename=filename_save_vars, timestamp=False)
+    save_to_json(vars_to_save, filename=filename_save_vars, add_timestamp=False)
 
     transformations = ["original", "translation", "rotation", "stretch", "shear", "gaussian", "outliers"]
     fig = plot_bar_chart(transformations, average_accs, pipelines)
