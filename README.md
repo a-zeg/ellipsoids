@@ -129,9 +129,9 @@ In both `ELLIPSOID-RIPS` and `ELLIPSOID-ALPHA` complexes, it is possible to, ins
 
 In some datasets, especially if very elongated ellipsoids are used, this construction can prevent unwanted cycles. Below is a comparison between an ellipsoid that has fixed axes ratio of 10:1 and one that starts off with axes ratio 10:1, but turns into a sphere as it grows large enough.
 
-![Ellipsoid plots](images/example_3_plot.png)
+![Ellipsoid plots](images/example_2_plot.png)
 
-The code used to generate this plot is in `ellipsoids/scripts/example_3.py`.
+The code used to generate this plot is in `ellipsoids/scripts/example_2.py`.
 
 
 # TODOs

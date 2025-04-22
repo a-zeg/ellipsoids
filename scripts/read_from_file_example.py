@@ -14,7 +14,7 @@ if __name__ == '__main__':
     folder = "data/test_read"
 
     experiments = []
-    filepaths = get_paths_of_files_in_a_folder(folder)
+    filepaths = get_paths_of_files_in_a_folder(folder, extension="json")
     for filepath in filepaths:
         experiments.append(Experiment.read_from_json(filepath))
 

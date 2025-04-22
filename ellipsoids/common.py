@@ -436,7 +436,7 @@ class Experiment:
         if not self.results:
             raise RuntimeError("Experiment has not been run yet, no results to save.")
         filepath = self._generate_filepath(filename, folder)
-        save_to_json(data=self.to_dict, filename=filepath, add_timestamp=True)
+        save_to_json(data=self.to_dict(), filename=filepath, add_timestamp=True)
 
 
 
