@@ -12,8 +12,11 @@ import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf
 import time
 import sys
+import os
 
-import plots
+sys.path.append(os.path.abspath('.'))
+
+import ellipsoids.turkevs.plots
 
 
 

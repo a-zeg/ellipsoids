@@ -17,6 +17,22 @@ from ellipsoids.common import Experiment
 
 
 
+def find_turkevs_dataset_path(id: str, folder: str = os.path.join("data/turkevs")):
+    folder = os.path.join(folder, f"turkevs_id={id}")
+    matches = []
+    for dirpath, _, filenames in os.walk(folder):
+        for filename in filenames:
+            if "datasets" in filename and id in filename:
+                full_path = os.path.join(dirpath, filename)
+                matches.append(full_path)
+    if not matches:
+        raise FileNotFoundError(f"No dataset found with id={id} within the folder {folder}.")
+    if len(matches) > 1:
+        raise RuntimeError(f"Multiple datasets found with id={id} within the folder {folder}: {len(matches)} matches found.")
+    return matches[0]
+
+
+
 def calculate_turkevs(datasets_path: str,
                       complexes_to_calculate: list[Parameters],
                       save_folder: Optional[str]=None):
@@ -53,7 +69,8 @@ def calculate_turkevs(datasets_path: str,
 
 if __name__ == '__main__':
 
-    path = "datasets/turkevs/turkevs_datasets_n_point_clouds=20_n_points=20_seed=0_id=0007.json"
+    id = "0000"
+    path = find_turkevs_dataset_path(id=id)
 
     # complexes_to_calculate = [EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS),
     #                           EllipsoidParameters(complex_subtype=ComplexSubtype.ALPHA),

@@ -12,7 +12,7 @@ if __name__ == '__main__':
     n_point_clouds = 20
     n_points = 20
 
-    folder = os.path.join("datasets", "turkevs")
+    folder = os.path.join("data", "turkevs")
     seed = 0
 
     generate_turkevs_datasets(n_point_clouds=n_point_clouds,

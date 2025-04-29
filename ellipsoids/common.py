@@ -216,7 +216,13 @@ class Parameters:
             return EllipsoidParameters.from_dict(data)
         return Parameters.from_dict(data)
 
+    def __eq__(self, other):
+        if not isinstance(other, Parameters):
+            return NotImplemented
+        return self.to_dict() == other.to_dict()
 
+    def __hash__(self):
+        return hash(frozenset(self.to_dict().items()))
 
 
 @dataclass
@@ -240,7 +246,8 @@ class EllipsoidParameters(Parameters):
         data = super().to_dict()
         data.update({
             "nbhd_size": self.nbhd_size,
-            "axes_ratios": self.axes_ratios,
+            # "axes_ratios": self.axes_ratios,
+            "axes_ratios": tuple(self.axes_ratios),
             "r_spherisize": self.r_spherisize,
             "save_ellipsoid_list": self.save_ellipsoid_list,
         })
@@ -261,6 +268,14 @@ class EllipsoidParameters(Parameters):
             r_spherisize=data["r_spherisize"],
             save_ellipsoid_list=data["save_ellipsoid_list"]
         )
+
+    def __eq__(self, other):
+        if not isinstance(other, Parameters):
+            return NotImplemented
+        return self.to_dict() == other.to_dict()
+
+    def __hash__(self):
+        return hash(frozenset(self.to_dict().items()))
 
 
 
@@ -346,7 +361,7 @@ class ExperimentSummary:
 
     def to_dict(self):
         return {
-            "dataset": self.dataset_summary.to_dict(),
+            "dataset_summary": self.dataset_summary.to_dict(),
             "parameters": self.parameters.to_dict(),
             "barcode": self.barcode,
             "execution_time": self.execution_time,
@@ -362,6 +377,7 @@ class ExperimentSummary:
         )
 
     def save_to_json(self, filename: str):
+        from data_handling import save_to_json
         save_to_json(data=self.to_dict(), filename=filename, add_timestamp=False)
 
     def generate_filename(self):
@@ -454,7 +470,9 @@ class Experiment:
         )
 
         if not folder and isinstance(dataset_summary.additional_info, TurkevsDatasetInfo):
-            folder = os.path.join("data", "turkevs", f"turkevs_id={dataset_summary.additional_info.dataset_id}")
+            folder = os.path.join("data", "turkevs",
+                                  f"turkevs_id={dataset_summary.additional_info.dataset_id}",
+                                  "experiment_summaries")
 
         filename = filename or experiment_summary.generate_filename()
         filepath = self._generate_filepath(filename=filename,

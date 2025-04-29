@@ -7,9 +7,15 @@ from sklearn.svm import SVR
 from sklearn import preprocessing
 from sklearn.pipeline import Pipeline
 
-import ph
-import data_construction
-import model
+import os
+import sys
+
+sys.path.append(os.path.abspath('.'))
+
+import ellipsoids.turkevs.model
+import ellipsoids.turkevs.ph
+import ellipsoids.turkevs.data_construction
+
 
 
 
@@ -69,4 +75,4 @@ def tune_hyperparameters(pds_train, labels_train, min_b = 0, max_b = 2, min_d = 
     # with open(PATH_CURRENT + "resuls/best_ph_pipeline.pkl", "wb") as f:
     #     pickle.dump(best_ph_pipeline, f)  
     
-    return best_ph_ml_pipeline   
+    return best_ph_ml_pipeline

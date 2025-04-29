@@ -6,8 +6,12 @@ from sklearn.svm import SVR
 # from sklearn.linear_model import LinearRegression
 # from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
+import os
+import sys
 
-import model
+sys.path.append(os.path.abspath('.'))
+
+import ellipsoids.turkevs.model
 
 
 
@@ -53,4 +57,4 @@ def tune_hyperparameters(data_train, labels_train):
 #                          ("classifier", SVC())])   
      
 #     best_ml_model, _ = model.grid_search(data_train, labels_train, param_grid, pipeline)    
-#     return best_ml_model   
+#     return best_ml_model

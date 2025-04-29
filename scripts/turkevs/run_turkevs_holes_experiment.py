@@ -38,7 +38,7 @@ import ellipsoids.turkevs.point_net as point_net
 import ellipsoids.turkevs.plots as plots
 
 import ellipsoids.data_handling as data_handling
-from ellipsoids.data_handling import ensure_folder_exists, read_from_json
+from ellipsoids.data_handling import ensure_folder_exists, filter_barcode, read_from_json
 from ellipsoids.data_handling import get_paths_of_files_in_a_folder
 from ellipsoids.common import TurkevsTransformation
 from ellipsoids.common import TurkevsDatasetInfo
@@ -48,6 +48,8 @@ from ellipsoids.common import Dataset
 
 from dataclasses import dataclass
 from typing import Callable, Any
+
+
 
 class Pipeline:
     name: str
@@ -95,7 +97,7 @@ def find_turkevs_datasets_path(id: str, folder: str = os.path.join("datasets", "
 
 
 def find_turkevs_experiment_summaries_path(id: str, folder: str = os.path.join("data", "turkevs")):
-    subfolder = os.path.join(folder, f"turkevs_id={id}")
+    subfolder = os.path.join(folder, f"turkevs_id={id}", "experiment_summaries")
     if not os.path.isdir(subfolder):
         raise FileNotFoundError(f"No results folder found for id={id} at {subfolder}.")
 
@@ -116,96 +118,28 @@ def generate_turkevs_results_path(id: str, folder: str = os.path.join("data", "t
 
 
 
-class GroupingKey:
-    def __init__(self, params):
-        self.params = frozenset(params.items())  # making the params immutable (needed to use instance of GroupingKey as a dictionary key)
+# class GroupingKey:
+#     def __init__(self, params):
+#         self.params = frozenset(params.items())  # making the params immutable (needed to use instance of GroupingKey as a dictionary key)
 
-    def __eq__(self, other):
-        return self.params == other.params # comparison for dictionary keys later on
+    # def __eq__(self, other):
+    #     return self.params == other.params # comparison for dictionary keys later on
 
-    def __hash__(self):
-        return hash(self.params) # also needed for comparisons ( i think )
+    # def __hash__(self):
+    #     return hash(self.params) # also needed for comparisons ( i think )
 
 
 
 from collections import defaultdict
 
-def group_experiment_summaries_by_parameters(summaries):
-    grouped_summaries = defaultdict(list)
-    for summary in summaries:
-        params = vars(summary.parameters)
-        key = GroupingKey(params)
-        grouped_summaries[key].append(summary)
-    return grouped_summaries
-
-
-
-
-
-
-
-#############################
-
-def read_turkevs_datasets(filepath: str, id: str, transformation: TurkevsTransformation = TurkevsTransformation.STANDARD):
-    print(f"Reading datasets from: {filepath}")
-    datasets = []
-
-    all_datasets_dict = read_from_json(filepath)
-    for dataset_dict in all_datasets_dict:
-        dataset = Dataset.from_dict(dataset_dict)
-        info = dataset.additional_info
-
-        is_turkevs = isinstance(info, TurkevsDatasetInfo)
-        matches_transformation = info.transformation == transformation if is_turkevs else False
-        matches_id = (id is None or info.dataset_id == id) if is_turkevs else False
-
-        if is_turkevs and matches_transformation and matches_id:
-            datasets.append(dataset)
-
-    print(f"Found {len(datasets)} datasets with transformation={transformation} and id={id}")
-    if not datasets:
-            raise ValueError(f"No datasets found with id={id} and transformation={transformation.fullname}.")
-
-    return datasets
-
-
-
-# def get_points_and_labels_from_dict(points_dict_of_lists):
-#     '''
-#     The variable points_dict_of_lists is a dictionary of lists.
-#     This function converts it into a dictionary of numpy arrays,
-#     performs consistency checks and generates labels.
-#     '''
-#     # converting the dictionary of lists into dictionary of numpy arrays
-#     data_pc_trnsfs = {}
-#     for key, value in points_dict_of_lists.items():
-#         data_pc_trnsfs[key] = []
-#         for element in points_dict_of_lists[key]:
-#             data_pc_trnsfs[key].append(np.asarray(element))
-
-#     labels = []
-#     num_point_clouds = len(data_pc_trnsfs['std'])
-#     holes_numbers = [0,1,2,4,9]
-
-#     trnsfs = ["std", "trns", "rot", "stretch", "shear", "gauss", "out"]
-
-#     # consistency checks:
-#     n_meshes_per_transformation = []
-#     for transformation in trnsfs:
-#         n_meshes_per_transformation.append(len(data_pc_trnsfs[transformation]))
-#     if n_meshes_per_transformation.count(n_meshes_per_transformation[0]) != len(n_meshes_per_transformation):
-#         exit('Data inconsistency: unequal number of meshes per transformation.')
-#     try: num_point_clouds % len(holes_numbers) == 0
-#     except:
-#         exit('Data inconsistency: the number of point clouds is not divisible by the number of different mesh types (holes).')
-
-#     # generating labels (assuming the points were read in in correct order)
-#     n_shapes = int(num_point_clouds / len(holes_numbers))
-#     for i in holes_numbers:
-#         labels += [i]*n_shapes # if n_shapes = 2, creates [0, 0, 1, 1, 2, 2, 4, 4, 9, 9]
-#     labels = np.asarray(labels)
-
-#     return data_pc_trnsfs, labels
+def group_by_parameters(object_list):
+    grouped_object_list = defaultdict(list)
+    for object in object_list:
+        params = vars(object.parameters)
+        # key = GroupingKey(params)
+        key = object.parameters
+        grouped_object_list[key].append(object)
+    return grouped_object_list
 
 
 
@@ -269,23 +203,48 @@ def divide_indices_into_train_and_test(indices, train_percentage=0.8, test_perce
 ##########
 
 
-def convert_to_turkevs_barcode_type(summaries: list) -> dict:
+def convert_to_turkevs_barcode_type(summaries: list, dimension: int = 1) -> dict:
+    """
+    should only pass summaries with same parameters
+    """
 
     result = {transformation.shortname: [] for transformation in TurkevsTransformation}
 
+    # getting mesh counts per transformation
     mesh_counts = defaultdict(int)
     for s in summaries:
-        t = s.dataset.additional_info.transformation
-        idx = s.dataset.additional_info.mesh_index
-        mesh_counts[t] = max(mesh_counts[t], idx+1)
+        transformation = s.dataset_summary.additional_info.transformation
+        mesh_index = s.dataset_summary.additional_info.mesh_index
+        mesh_counts[transformation.shortname] = max(mesh_counts[transformation.shortname], mesh_index+1) # mesh_index+1 because the indexing starts from 0
 
-    for t in result:
-        result[t] = [None] * mesh_counts[t]
+    counts = set(mesh_counts.values())
+    if len(counts) > 1:
+        raise ValueError(f"Inconsistent mesh counts detected: {mesh_counts}")
 
+    # initalizing the result array using the count just obtained
+    for transformation in result:
+        result[transformation] = [None] * mesh_counts[transformation]
+
+    # filtering and putting the barcodes into the correct places in the final dictionary
     for s in summaries:
-        t = s.dataset.additional_info.transformation
-        mesh_index = s.dataset.additional_info.mesh_index
-        result[t][mesh_index] = s.barcodes
+        transformation = s.dataset_summary.additional_info.transformation
+        mesh_index = s.dataset_summary.additional_info.mesh_index
+        barcode = s.barcode
+        filtered_barcode_no_dim = [bar[1] for bar in filter_barcode(barcode, dim=dimension)]
+        result[transformation.shortname][mesh_index] = filtered_barcode_no_dim
+
+    return result
+
+
+
+def pde_1_by_parameters(experiment_summaries: list[ExperimentSummary]):
+    summaries_grouped_by_parameters = group_by_parameters(experiment_summaries)
+
+    pde_1 = {key: {} for key in summaries_grouped_by_parameters}
+    for parameters, summaries in summaries_grouped_by_parameters.items():
+        pde_1[parameters] = convert_to_turkevs_barcode_type(summaries, dimension = 1)
+
+    return pde_1
 
 
 
@@ -316,21 +275,47 @@ def run_experiments(experiment_summaries_path: str, dataset_path: str, results_p
     print("TRAIN_SIZES = ", TRAIN_SIZES)
 
     '''
+    extra todo:
+    0. ⚠️ store the dataset together with the experiments
     this code should:
-    1. import all (ellipsoid and rips persistence diagrams in dimension 1 for datasets of given id) into two lists, import labels into a list
-    2. divide all those into train and test data
-    3.
+    1. ✅ import all summaries
+    2. ✅ group summaries by parameters
+    3. ✅ for every parameter set, generate the format that can be fed into the turkevs pipeline (so the dict with keys transformation and lists of meshes) while allowing the user to select what kind of feature they want (so like dim 1 bars e.g.)
+    4. read in the original datasets (for computing other signatures on them)
+    5. get train and test indices
+    6. filter out the train / test data
+    7. do the training / hyperfitting whatever
+    8. process the results.
     '''
 
 
 
     experiment_summaries = load_all_experiment_summaries(experiment_summaries_path)
-    summaries_grouped_by_parameters = group_experiment_summaries_by_parameters(experiment_summaries)
+    pde_1 = pde_1_by_parameters(experiment_summaries)
+    print(pde_1)
+    exit()
 
-    for parameters, summaries in summaries_grouped_by_parameters:
-        pde_1 = convert_to_turkevs_barcode_type(summaries)
 
-    # pde has like pde["transformation"][dataset]
+
+    datasets_path = find_turkevs_datasets_path()
+    datasets = load_turkevs_datasets(datasets_path)
+
+    num_point_clouds = len(datasets[TurkevsTransformation.STANDARD])
+    indices = get_indices_from_datasets(datasets)
+
+    consistency_check(indices, experiment_summaries) # are all indices also in experiment_summaries?
+    # maybe i should also store a hash of the dataset? but then if like a space is added somewhere, it will ruin consistency.
+
+    train_indices, test_indices = divide_indices_into_train_and_test(indices)
+
+
+
+
+
+
+    ###############
+
+
 
 
     barcodes,labels = extract_barcodes_and_labels(experiment_summaries)
@@ -448,7 +433,7 @@ if __name__ == '__main__':
 
     n_runs = 20
 
-    ids = ['id=0005'] # (0001 is the first downsampled, also calculated with the prev version of the code)
+    ids = ['0000'] # (0001 is the first downsampled, also calculated with the prev version of the code)
 
     for id in ids:
 

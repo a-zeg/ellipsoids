@@ -5,12 +5,18 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from keras.wrappers.scikit_learn import KerasClassifier
-from keras.wrappers.scikit_learn import KerasRegressor
+# from keras.wrappers.scikit_learn import KerasClassifier
+# from keras.wrappers.scikit_learn import KerasRegressor
+from scikeras.wrappers import KerasClassifier
+from scikeras.wrappers import KerasRegressor
 from sklearn.metrics import mean_squared_error
 
-import model
+import os
+import sys
 
+sys.path.append(os.path.abspath('.'))
+
+import ellipsoids.turkevs.model
 
 
 
@@ -195,4 +201,4 @@ def tune_hyperparameters(data_train, labels_train):
         best_point_net = build_model_classification(num_points, num_classes, num_filters = num_filters_best, learning_rate = learning_rate_best)
     else:
         best_point_net = build_model_regression(num_points, num_filters = num_filters_best, learning_rate = learning_rate_best)
-    return best_point_net  
+    return best_point_net

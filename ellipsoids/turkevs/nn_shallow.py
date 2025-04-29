@@ -1,11 +1,24 @@
+# import numpy as np
+# from tensorflow import keras
+# from keras.wrappers.scikit_learn import KerasClassifier
+# from keras.wrappers.scikit_learn import KerasRegressor
+# from sklearn.metrics import mean_squared_error
+# # import keras_tuner as kt
+
 import numpy as np
 from tensorflow import keras
-from keras.wrappers.scikit_learn import KerasClassifier
-from keras.wrappers.scikit_learn import KerasRegressor
+from scikeras.wrappers import KerasClassifier
+from scikeras.wrappers import KerasRegressor
 from sklearn.metrics import mean_squared_error
 # import keras_tuner as kt
 
-import model
+import os
+import sys
+
+sys.path.append(os.path.abspath('.'))
+
+import ellipsoids.turkevs.model
+
 
 
 
@@ -79,4 +92,4 @@ def tune_hyperparameters(data_train, labels_train):
     else:
         best_nn_shallow = build_model_regression(num_features, input_layer_width_best, hidden_layer_width_best, learning_rate_best)
         
-    return best_nn_shallow  
+    return best_nn_shallow

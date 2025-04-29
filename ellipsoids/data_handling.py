@@ -565,7 +565,8 @@ def generate_turkevs_datasets(n_point_clouds: int,
                               n_points: int,
                               seed: int,
                               folder=os.path.join("datasets","turkevs"),
-                              save_to_file=True):
+                              save_to_file=True,
+                              separate_folder=True):
 
     np.random.seed(seed)
     print("\n\nConstructing the data...")
@@ -600,7 +601,10 @@ def generate_turkevs_datasets(n_point_clouds: int,
             all_datasets.append(dataset)
 
     if save_to_file:
-        filename =  f"turkevs_datasets_{n_point_clouds=}_{n_points=}_seed={seed}_id={dataset_id}"
+        filename_parameters = f"{n_point_clouds=}_{n_points=}_seed={seed}_id={dataset_id}"
+        filename =  f"turkevs_datasets_{filename_parameters}"
+        if separate_folder:
+            folder = os.path.join(folder, f"turkevs_{filename_parameters}")
         filepath = os.path.join(folder, filename)
         save_to_json([d.to_dict() for d in all_datasets], filename=filepath, add_timestamp=False)
 
