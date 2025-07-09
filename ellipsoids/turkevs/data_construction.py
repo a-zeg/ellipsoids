@@ -21,6 +21,7 @@ import os
 import sys
 
 from scipy.spatial import ConvexHull
+from scipy.spatial.distance import pdist, squareform
 from descartes import PolygonPatch
 from shapely.geometry import Point 
 from matplotlib.path import Path
@@ -131,17 +132,35 @@ def sample_rose_curve(n = NUM_POINTS, a = 2):
 
 
 
-def sample_rose_nine_petals(n = NUM_POINTS):
-    n_rose_three_petals = int(n/3)
-    rose1 = sample_rose_curve(n_rose_three_petals, a = 3)
-    rose2 = rotate(rose1, t = np.pi/4.5)
-    rose3 = rotate(rose2, t = np.pi/4.5)
+# def sample_rose_nine_petals(n = NUM_POINTS):
+#     n_rose_three_petals = int(n/3)
+#     rose1 = sample_rose_curve(n_rose_three_petals, a = 3)
+#     rose2 = rotate(rose1, t = np.pi/4.5)
+#     rose3 = rotate(rose2, t = np.pi/4.5)
+#     n_rmn = n - 3 * n_rose_three_petals
+#     if n % 3 == 0:
+#         X = np.concatenate([rose1, rose2, rose3])
+#     else:
+#         center = np.asarray([(0, 0)] * n_rmn)
+#         X = np.concatenate([rose1, rose2, rose3, center])
+#     return X
+def sample_rose_nine_petals(n=NUM_POINTS):
+    n_rose_three_petals = int(n / 3)
+    rose1 = sample_rose_curve(n_rose_three_petals, a=3)
+    rose2 = rotate(rose1, t=np.pi / 4.5)
+    rose3 = rotate(rose2, t=np.pi / 4.5)
     n_rmn = n - 3 * n_rose_three_petals
-    if n % 3 == 0:
-        X = np.concatenate([rose1, rose2, rose3]) 
-    else:
-        center = np.asarray([(0, 0)] * n_rmn)
-        X = np.concatenate([rose1, rose2, rose3, center]) 
+
+    # Add all rose petals
+    X = np.concatenate([rose1, rose2, rose3])
+
+    # If points are remaining, add them near the center with small noise
+    if n_rmn > 0:
+        epsilon = 1e-6  # Small noise to avoid exact duplicates
+        center_noise = np.random.normal(scale=epsilon, size=(n_rmn, 2))
+        center = np.zeros((n_rmn, 2)) + center_noise
+        X = np.concatenate([X, center])
+
     return X
 
 
@@ -366,7 +385,8 @@ def sample_handlebody(n = NUM_POINTS, r = 1, r1 = 0.5, r2 = 0.25):
         z = torus1[p, 2]
         if x**2 + y**2 + z**2 > r**2:
             handle1.append([x, y, z])
-    handle1 = np.asarray(handle1)
+    # handle1 = np.asarray(handle1)
+    handle1 = np.asarray(handle1).reshape(-1, 3)
     n_handle1 = handle1.shape[0]
             
     torus2 = np.asarray([-r, 0, 0]) + torus      
@@ -377,7 +397,8 @@ def sample_handlebody(n = NUM_POINTS, r = 1, r1 = 0.5, r2 = 0.25):
         z = torus2[p, 2]
         if x**2 + y**2 + z**2 > r**2:
             handle2.append([x, y, z])
-    handle2 = np.asarray(handle2)
+    # handle2 = np.asarray(handle2)
+    handle2 = np.asarray(handle2).reshape(-1, 3)
     n_handle2 = handle2.shape[0]
             
     torus3 = np.asarray([0, r, 0]) + torus 
@@ -388,7 +409,8 @@ def sample_handlebody(n = NUM_POINTS, r = 1, r1 = 0.5, r2 = 0.25):
         z = torus3[p, 2]
         if x**2 + y**2 + z**2 > r**2:
             handle3.append([x, y, z])
-    handle3 = np.asarray(handle3)
+    # handle3 = np.asarray(handle3)
+    handle3 = np.asarray(handle3).reshape(-1, 3)
     n_handle3 = handle3.shape[0]
             
     torus4 = np.asarray([0, -r, 0]) + torus
@@ -399,8 +421,10 @@ def sample_handlebody(n = NUM_POINTS, r = 1, r1 = 0.5, r2 = 0.25):
         z = torus4[p, 2]
         if x**2 + y**2 + z**2 > r**2:
             handle4.append([x, y, z])
-    handle4 = np.asarray(handle4)
-    n_handle4 = handle4.shape[0]   
+    # handle4 = np.asarray(handle4)
+    handle4 = np.asarray(handle4).reshape(-1, 3)
+
+    n_handle4 = handle4.shape[0]
     
     n_rmn = n - n_handle1 - n_handle2 - n_handle3 - n_handle4
     n_sphere = int(0.9 * n_rmn)
@@ -1369,24 +1393,46 @@ def flatten_symmetric_matrices(matrices):
 
 
 
-def calculate_distance_matrices_flat(point_clouds):
+# def calculate_distance_matrices_flat(point_clouds):
+#     # print("Calculating distance matrices (above the diagonal, and flattened) from the given point clouds...")
+#     # If point clouds have more than 1000 points, calculating distance matrices because computationally too demanding, but also redundant.
+#     point_clouds_sparse = []
+#     num_samples = len(point_clouds)
+#     for s in range(num_samples):
+#         point_clouds_sparse.append(point_clouds[s][0:100, :])
+#     num_samples = len(point_clouds)
+#     num_features = point_clouds[0].shape[0]
+#     distance_matrices = np.zeros((num_samples, 100, 100))
+#     for s in range(num_samples):
+#         distance_matrices[s] = euclidean_distances(point_clouds_sparse[s])
+#         distance_matrices[s] = np.around(distance_matrices[s], 3)
+#     distance_matrices_flat = flatten_symmetric_matrices(distance_matrices)
+#     # distance_matrices_flat = preprocessing.StandardScaler().fit_transform(distance_matrices_flat)
+#     print("distance_matrices_flat.shape = ", distance_matrices_flat.shape)
+#     return distance_matrices_flat
+
+def calculate_distance_matrices_flat(point_clouds, max_points: int = 100):
     # print("Calculating distance matrices (above the diagonal, and flattened) from the given point clouds...")
     # If point clouds have more than 1000 points, calculating distance matrices because computationally too demanding, but also redundant.
     point_clouds_sparse = []
-    num_samples = len(point_clouds)
-    for s in range(num_samples):
-        point_clouds_sparse.append(point_clouds[s][0:100, :])    
-    num_samples = len(point_clouds)
-    num_features = point_clouds[0].shape[0]
-    distance_matrices = np.zeros((num_samples, 100, 100))
-    for s in range(num_samples):
-        distance_matrices[s] = euclidean_distances(point_clouds_sparse[s])
-        distance_matrices[s] = np.around(distance_matrices[s], 3)          
-    distance_matrices_flat = flatten_symmetric_matrices(distance_matrices)     
-    # distance_matrices_flat = preprocessing.StandardScaler().fit_transform(distance_matrices_flat)   
+    n_samples = len(point_clouds)
+
+    for point_cloud in point_clouds:
+        n_points = len(point_cloud)
+        n_used_points = min(n_points, max_points)
+        point_clouds_sparse.append(point_cloud[:n_used_points, :])
+
+    n_used_points = point_clouds_sparse[0].shape[0]
+    distance_matrices = np.zeros((n_samples, n_used_points, n_used_points))
+
+    for s in range(n_samples):
+        # distance_matrices[s] = euclidean_distances(point_clouds_sparse[s])
+        distance_matrices[s] = squareform(pdist(point_clouds_sparse[s], metric='euclidean'))
+        distance_matrices[s] = np.around(distance_matrices[s], 3)
+    distance_matrices_flat = flatten_symmetric_matrices(distance_matrices)
+    # distance_matrices_flat = preprocessing.StandardScaler().fit_transform(distance_matrices_flat)
     print("distance_matrices_flat.shape = ", distance_matrices_flat.shape)
     return distance_matrices_flat
-
 
 
 def calculate_distance_matrices_flat_under_trnsfs(point_clouds_trnsfs, trnsfs):    

@@ -10,11 +10,11 @@ from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.topological_computations import find_intersection_radius
 from ellipsoids.topological_computations import get_max_axes_ratio
 from ellipsoids.topological_computations import ellipsoid_intersection
-from ellipsoids.topological_computations import reduce_barcode
+# from ellipsoids.topological_computations import reduce_barcode
 from ellipsoids.topological_computations import pad_axes_ratios
-from ellipsoids.topological_computations import spherisize
-from ellipsoids.topological_computations import scale_to_01
-from ellipsoids.data_handling import printListOfSimplices
+from ellipsoids.common import spherisize
+from ellipsoids.common import scale_to_01
+from ellipsoids.data_handling import print_list_of_simplices
 from ellipsoids.topological_computations import adjacent_delaunay_vertices
 # from src.topological_computations import get_axes_ratios
 
@@ -208,30 +208,30 @@ def test_generate_ellipsoid_simplex_tree4():
     assert _simplex_trees_equal(simplex_tree[0], simplex_tree_target_approx)
 
 
-def test_reduce_barcode():
+# def test_reduce_barcode():
 
-    barcode = [
-        [0, [0,1]],
-        [0, [-0.5, 1]],
-        [1, [-0.3, 0.3]],
-        [42, [-10, 353]]
-    ]
+#     barcode = [
+#         [0, [0,1]],
+#         [0, [-0.5, 1]],
+#         [1, [-0.3, 0.3]],
+#         [42, [-10, 353]]
+#     ]
 
-    target_barcode = [
-        [0, [0,1]],
-        [0, [-0.5, 1]]
-    ]
+#     target_barcode = [
+#         [0, [0,1]],
+#         [0, [-0.5, 1]]
+#     ]
 
-    reduced_barcode, _ = reduce_barcode(barcode, nBarsDim0=2, nBarsDim1=0, nBarsDim2=0)
-    assert target_barcode == reduced_barcode
+#     reduced_barcode, _ = reduce_barcode(barcode, nBarsDim0=2, nBarsDim1=0, nBarsDim2=0)
+#     assert target_barcode == reduced_barcode
 
 
-    target_barcode = [
-        [0, [0,1]]
-    ]
+#     target_barcode = [
+#         [0, [0,1]]
+#     ]
 
-    reduced_barcode, _ = reduce_barcode(barcode, nBarsDim0=1, nBarsDim1=0, nBarsDim2=0)
-    assert target_barcode == reduced_barcode
+#     reduced_barcode, _ = reduce_barcode(barcode, nBarsDim0=1, nBarsDim1=0, nBarsDim2=0)
+#     assert target_barcode == reduced_barcode
 
 
 def test_max_filtration():

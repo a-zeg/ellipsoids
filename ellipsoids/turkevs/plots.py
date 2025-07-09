@@ -233,10 +233,7 @@ def plot_polygon(polygon, points):
     plt.show()
     
     
-# note to self:
-# check whether i can return fig with this function and then save it 
-# from turkevs_holes_experiment (without having fig.show here) 
-def plot_bar_chart(x_ticks_labels, y_values_per_bar_container, legend_labels):  
+def plot_bar_chart(x_ticks_labels, y_values_per_bar_container, legend_labels, errs_per_bar_container=None, title=None):
     '''
     Plot the grouped bar chart with given values.
     
@@ -252,21 +249,44 @@ def plot_bar_chart(x_ticks_labels, y_values_per_bar_container, legend_labels):
     width_bar = 0.65 * 1/num_bars_per_x_tick
     width_from_x_tick = np.arange(num_bars_per_x_tick) - np.floor(num_bars_per_x_tick/2)  # (..., -3, -2, -1, 0, 1, 2, 3, ...)
     fig, axes = plt.subplots(figsize = (20, 7)) 
-    cmap = plt.get_cmap('tab10') # we have two levels of each type of noise
-    bar_colors = [cmap.colors[t] for t in range(num_bars_per_x_tick)]     
+    cmap = plt.get_cmap('tab20') # we have two levels of each type of noise
+    bar_colors = [cmap(t/num_bars_per_x_tick) for t in range(num_bars_per_x_tick)]
     for t, legend_label in enumerate(legend_labels):    
-        axes.bar(x_ticks + width_from_x_tick[t] * width_bar, y_values_per_bar_container[legend_label], width_bar, 
-                 label = legend_label, color = bar_colors[t])        
+        axes.bar(x_ticks + width_from_x_tick[t] * width_bar,
+                 y_values_per_bar_container[legend_label],
+                 width_bar,
+                 label = legend_label,
+                 color = bar_colors[t])
     axes.set_xticks(x_ticks)
     axes.set_xticklabels(x_ticks_labels, fontsize = 20)
     axes.set_axisbelow(True)
     axes.set_ylim(0, 1)
     axes.yaxis.grid()
-    axes.set_ylabel("accuracy", fontsize = 20)  
+    axes.set_ylabel("accuracy", fontsize = 20)
+    if title is not None: axes.set_title(title, fontsize = 20)
     
     legend = axes.legend(legend_labels, ncol = 1, fontsize = 20, bbox_to_anchor=(1.2, 1)) 
     for t, line in enumerate(legend.get_lines()):
         line.set_linewidth(4.0)    
     # plt.show(blocking=False)
-    
+
+    if errs_per_bar_container is not None:
+        for t, legend_label in enumerate(legend_labels):
+            errs = [e for e in errs_per_bar_container[legend_label]]
+            axes.errorbar(x_ticks+width_from_x_tick[t]*width_bar,
+                          y_values_per_bar_container[legend_label],
+                          yerr=[errs, [0]*len(errs)],
+                          linestyle='None',
+                          marker='None',
+                          color="white",
+                          capsize=2,
+                          elinewidth=0.5)
+            axes.errorbar(x_ticks+width_from_x_tick[t]*width_bar,
+                          y_values_per_bar_container[legend_label],
+                          yerr=[[0]*len(errs), errs],
+                          linestyle='None',
+                          marker='None',
+                          color = bar_colors[t],
+                          capsize=2,
+                          elinewidth=0.5)
     return fig, axes

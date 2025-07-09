@@ -36,13 +36,13 @@ def plot_filtration(X, fil_complex = "rips", fil_fun = "distance", fil_fun_vals 
 
 
         
-def calculate_pds(X, fil_complex = "rips", fil_fun = "distance", m = 0.001, p = 1):    
+def calculate_pds(X, fil_complex = "rips", fil_fun = "distance", m = 0.001, p = 1):
     if fil_complex == "rips" or fil_complex == "alpha":
-        simplex_tree = calculate_simplicial_simplex_tree(X, fil_complex, fil_fun, m, p)                 
+        simplex_tree = calculate_simplicial_simplex_tree(X, fil_complex, fil_fun, m, p)
     elif fil_complex == "cubical":
-        simplex_tree, _ = calculate_cubical_simplex_tree(X, fil_fun)        
-    simplex_tree.persistence()     
-    pd0 = simplex_tree.persistence_intervals_in_dimension(0)    
+        simplex_tree, _ = calculate_cubical_simplex_tree(X, fil_fun)
+    simplex_tree.persistence()
+    pd0 = simplex_tree.persistence_intervals_in_dimension(0)
     # pd0 = pd0[0:(len(pd0)-1)] # Do not consider the last interval with d = np.inf.    
     pd1 = simplex_tree.persistence_intervals_in_dimension(1)
     return pd0, pd1
@@ -289,6 +289,7 @@ def fil_fun_val_edge_weighted_rips(fx, fy, d, p = np.inf, num_iterations = 10):
     return fxy
 
 
+from scipy.spatial.distance import pdist, squareform
 
 def calculate_simplicial_simplex_tree(X, sim_complex = "rips", fil_fun = "distance", m = 0.001, p = 1): # max_dim  = 2, filtration_max = np.inf):
     '''
@@ -306,21 +307,21 @@ def calculate_simplicial_simplex_tree(X, sim_complex = "rips", fil_fun = "distan
     Output:
         simplex_tree:      gudhi.SimplexTree.
     '''       
-        
+
     if sim_complex == "rips":
-        simplicial_complex = gd.RipsComplex(X, max_edge_length = np.inf)
-        simplex_tree_distance = simplicial_complex.create_simplex_tree(max_dimension = 2) 
-        Y = np.copy(X)        
+        simplicial_complex = gd.RipsComplex(points=X, max_edge_length = np.inf)
+        simplex_tree_distance = simplicial_complex.create_simplex_tree(max_dimension = 2)
+        Y = np.copy(X)
     elif sim_complex == "alpha":
         # PH on AlphaComplex is computationally much less demanding than PH on RipsComplex.
         # https://github.com/GUDHI/TDA-tutorial/blob/master/Tuto-GUDHI-ConfRegions-PersDiag-datapoints.ipynb:
         # When computing confidence regions for alpha complexes, we need to be careful with the 
         # scale of values of the filtration because the filtration value of each simplex is computed as 
         # the square of the circumradius of the simplex (if the circumsphere is empty).
-        # https://github.com/GUDHI/TDA-tutorial/blob/master/utils/utils_quantization.py        
+        # https://github.com/GUDHI/TDA-tutorial/blob/master/utils/utils_quantization.py
         simplicial_complex = gd.AlphaComplex(X)
         simplex_tree_distance = simplicial_complex.create_simplex_tree() # Although not yet necessary, it must be calculated in order to run simplicial_complex.get_point().
-        
+
         # Y = np.array([simplicial_complex.get_point(i) for i in range(X.shape[0])]) # gudhi.AlphaComplex may change the ordering of the points.
         # In a rare scenario, it can happen that X.shape[0] != gd.AlphaComplex(X).create_simplex_tree().num_vertices(), returning an error.
         num_pc_points = X.shape[0]
@@ -344,10 +345,19 @@ def calculate_simplicial_simplex_tree(X, sim_complex = "rips", fil_fun = "distan
     # all the filtration values are doubled compared to the definition in the paper for the consistency with RipsComplex.    
     # fx = 2 * wx
     # fxy = 2 * fxy
-    
+
+
+
+    ## original (produces matmul warnings on M4 https://github.com/numpy/numpy/issues/28687):
+    # simplex_tree_filtration = gd.SimplexTree()
+    # dis_matrix = euclidean_distances(Y)
+
+    ## alternative (no warnings on M4):
     simplex_tree_filtration = gd.SimplexTree()
-    dis_matrix = euclidean_distances(Y)          
-    for (simplex, _) in simplex_tree_distance.get_skeleton(2):  
+    dis_matrix = squareform(pdist(Y, metric='euclidean'))
+
+
+    for (simplex, _) in simplex_tree_distance.get_skeleton(2):
         # Add vertices.
         if len(simplex) == 1:
             i = simplex[0]
@@ -359,7 +369,7 @@ def calculate_simplicial_simplex_tree(X, sim_complex = "rips", fil_fun = "distan
             fil_fun_val_edge = fil_fun_val_edge_weighted_rips(fil_fun_vals_vertices[i], fil_fun_vals_vertices[j], dis_matrix[i, j], p)        
             simplex_tree_filtration.insert([i,j], filtration = 2 * fil_fun_val_edge)
 
-       
+
     # PH is not sensitive to the range of x, y, and z values for the point cloud coordinates, or to scaling.
     # The lifespan will reflect the size of the cycles, and since shapes can be plotted in different ranges.
     # we want to scale relative to the point cloud.
@@ -367,12 +377,12 @@ def calculate_simplicial_simplex_tree(X, sim_complex = "rips", fil_fun = "distan
     # xmax = np.max(X[:, 0])
     # ymin = np.min(X[:, 1])
     # ymax = np.max(X[:, 1])
-    # max_dist = np.sqrt((xmax - xmin)**2 + (ymax-ymin)**2)     
+    # max_dist = np.sqrt((xmax - xmin)**2 + (ymax-ymin)**2)
     fil_fun_vals = []
     for (simplex, fil_fun_val) in simplex_tree_filtration.get_skeleton(2):
         fil_fun_vals.append(fil_fun_val)
-    
-    min_fil_fun_val = min(fil_fun_vals) 
+
+    min_fil_fun_val = min(fil_fun_vals)
     max_fil_fun_val = max(fil_fun_vals)    
     # print("min_fil_fun_val = ",  np.around(min_fil_fun_val, 2))
     # print("max_fil_fun_val = ",  np.around(max_fil_fun_val, 2))
@@ -386,7 +396,7 @@ def calculate_simplicial_simplex_tree(X, sim_complex = "rips", fil_fun = "distan
             j = simplex[1]
             simplex_tree_normalized.insert([i,j], filtration = fil_fun_val / max_fil_fun_val)
             
-    
+
     # PH is not sensitive to the size of the cycle.
     # It is difficult to guess the suitable threshold perc, better let this be learnt from the data (labels)?
     simplex_tree_binarized = gd.SimplexTree()  
@@ -406,13 +416,13 @@ def calculate_simplicial_simplex_tree(X, sim_complex = "rips", fil_fun = "distan
             else:
                 simplex_tree_binarized.insert([i,j], filtration = 1)
             
-  
+
     simplex_tree_final = simplex_tree_filtration
     # simplex_tree_final = simplex_tree_normalized
-    
+
     max_dim = 2
     simplex_tree_final.expansion(max_dim)    
-    
+
     # st.prune_above_filtration(filtration_max)
     # or before st.insert() statements above check if  value<filtration_max:
     

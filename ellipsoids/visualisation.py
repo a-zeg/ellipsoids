@@ -12,7 +12,7 @@ from scipy.spatial import Delaunay
 from ellipsoids.data_handling import read_from_json
 from ellipsoids.data_handling import ensure_folder_exists
 
-from ellipsoids.topological_computations import reduce_barcode
+# from ellipsoids.topological_computations import reduce_barcode
 # from ellipsoids.visualisation.barcodePlotting import plot_persistence_barcode, plot_persistence_density
 from gudhi.persistence_graphical_tools import _limit_to_max_intervals, __min_birth_max_death
 from ellipsoids.topological_computations import spherisize_axes
@@ -105,11 +105,13 @@ def plot_circles(points, r=1, axes=None):
 
 
 
-def plot_simplex_tree(points: np.ndarray,
-                      simplexTree: gd.SimplexTree,
-                      filtration: float,
-                      axes: plt.Axes,
-                      simplex_color='r'):
+def plot_simplex_tree(
+        points: np.ndarray,
+        simplexTree: gd.SimplexTree,
+        filtration: float,
+        axes: plt.Axes,
+        simplex_color='r'
+        ):
     dim = len(points[0])
     if dim > 3:
         raise ValueError('Error: Attempting to plot simplex tree in dimension higher than 3.')
@@ -220,7 +222,8 @@ def plot_barcode(
     x = [birth for (dim, (birth, death)) in barcode]
     y = [(death - birth) if death != float("inf") else (infinity - birth) for (dim, (birth, death)) in barcode]
     c = [colormap[dim] for (dim, (birth, death)) in barcode]
- 
+
+
     axes.barh(range(len(x)), y, left=x, alpha=alpha, color=c, height=bar_height)
 
     dimensions = {item[0] for item in barcode}
@@ -258,16 +261,16 @@ def plot_barcode(
 
 
 
-def calculate_barcodes(results_list: list[Results]):
-    list_barcodes = []
-    max_lengths = []
+# def calculate_barcodes(results_list: list[Results]):
+#     list_barcodes = []
+#     max_lengths = []
 
-    for results in results_list:
-        barcode, max_length = reduce_barcode(results.barcode)
-        list_barcodes.append(barcode)
-        max_lengths.append(max_length)
+#     for results in results_list:
+#         barcode, max_length = reduce_barcode(results.barcode)
+#         list_barcodes.append(barcode)
+#         max_lengths.append(max_length)
 
-    return list_barcodes, max(max_lengths) * 1.1
+#     return list_barcodes, max(max_lengths) * 1.1
 
 
 
@@ -322,9 +325,13 @@ def ax_title_barcode(experiment: Experiment):
     dataset = experiment.dataset
 
     if isinstance(parameters, EllipsoidParameters):
-        return f"{dataset.data_type} [n={dataset.n_points()}]: {parameters.complex_type}-{parameters.complex_subtype} r_s={parameters.r_spherisize}"
+        return f"{dataset.data_type} [n={dataset.n_points}]: " \
+            + f"{parameters.complex_type}-{parameters.complex_subtype}; \n"\
+            + f"r_s={parameters.r_spherisize}; " \
+            + f"axes_ratios={parameters.axes_ratios_to_str()}; " \
+            + f"nbhd_size={parameters.nbhd_size}"
     else:
-        return f"{dataset.data_type} [n={dataset.n_points()}]: {parameters.complex_type}-{parameters.complex_subtype}"
+        return f"{dataset.data_type} [n={dataset.n_points}]: {parameters.complex_type}-{parameters.complex_subtype}"
 
 
 
@@ -390,6 +397,8 @@ def plot_experiment(experiment: Experiment,
     plot_parameters = experiment.plot_parameters
     dataset = experiment.dataset
 
+    fig = None
+
     if ax_barcode == None and ax_plot == None:
         n_axes_per_experiment = 1 + should_plot_spatial_data([experiment])
         fig, axes = plt.subplots(1, n_axes_per_experiment)
@@ -419,6 +428,11 @@ def plot_experiment(experiment: Experiment,
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.6)
         plt.show()
+
+    if fig is None and ax_barcode is not None:
+        fig = ax_barcode.get_figure()
+
+    return fig
 
 
 

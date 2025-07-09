@@ -16,7 +16,7 @@ import sys
 
 sys.path.append(os.path.abspath('.'))
 
-import ellipsoids.turkevs.model
+import ellipsoids.turkevs.model as model
 
 
 
@@ -165,12 +165,13 @@ def dense_bn(x, filters):
 
 def tune_hyperparameters(data_train, labels_train):    
     num_points = data_train.shape[1]
-    
+
     # Classification problem.
     if "int" in str(type(labels_train[0])) or "str" in str(type(labels_train[0])):
         problem_type = "classification"
         num_classes = len(np.unique(labels_train))
-        point_net = KerasClassifier(build_fn = build_model_classification, 
+        # point_net = KerasClassifier(build_fn = build_model_classification,
+        point_net = KerasClassifier(model = build_model_classification,
                                      epochs = 2, 
                                      verbose = 0,
                                      num_points = num_points, 
@@ -178,7 +179,8 @@ def tune_hyperparameters(data_train, labels_train):
     # Regresssion problem.
     else:
         problem_type = "regression"
-        point_net = KerasRegressor(build_fn = build_model_regression, 
+        # point_net = KerasRegressor(build_fn = build_model_regression,
+        point_net = KerasRegressor(build_fn = build_model_regression,
                                    epochs = 2, 
                                    verbose = 0,
                                    num_points = num_points)
@@ -189,14 +191,18 @@ def tune_hyperparameters(data_train, labels_train):
     print("PointNet hyperparameters:")
     print("nums_filters = ", nums_filters)
     print("learning_rates = ", learning_rates)
-    param_grid = {"num_filters": nums_filters, 
-                  "learning_rate": learning_rates}       
+    # param_grid = {"num_filters": nums_filters,
+    #               "learning_rate": learning_rates}
+    param_grid = {"model__num_filters": nums_filters,
+                  "model__learning_rate": learning_rates}
     best_point_net, grid_search = model.grid_search(data_train, labels_train, param_grid, point_net)
         
     # Do not return KerasClassifier instance, since fit() will then always build a NEW MODEL to train.
     # We need to return Keras model instance with the best parameters.        
-    num_filters_best = grid_search.best_params_["num_filters"]
-    learning_rate_best = grid_search.best_params_["learning_rate"]        
+    # num_filters_best = grid_search.best_params_["num_filters"]
+    # learning_rate_best = grid_search.best_params_["learning_rate"]
+    num_filters_best = grid_search.best_params_["model__num_filters"]
+    learning_rate_best = grid_search.best_params_["model__learning_rate"]
     if problem_type == "classification":
         best_point_net = build_model_classification(num_points, num_classes, num_filters = num_filters_best, learning_rate = learning_rate_best)
     else:

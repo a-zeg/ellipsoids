@@ -11,7 +11,7 @@ import sys
 
 sys.path.append(os.path.abspath('.'))
 
-import ellipsoids.turkevs.model
+import ellipsoids.turkevs.model as model
 
 
 

@@ -12,7 +12,7 @@ import sys
 
 sys.path.append(os.path.abspath('.'))
 
-import ellipsoids.turkevs.model
+import ellipsoids.turkevs.model as model
 
 
 
@@ -22,7 +22,9 @@ def build_model_classification(num_features, num_classes, depth, input_layer_wid
     model = keras.models.Sequential()
     
     # Input layer.
-    model.add(keras.layers.Dense(input_layer_width, input_dim = num_features, activation = "relu")) 
+    # model.add(keras.layers.Dense(input_layer_width, input_dim = num_features, activation = "relu"))
+    model.add(keras.Input(shape=(num_features,)))
+    model.add(keras.layers.Dense(input_layer_width, activation="relu"))
     
     # Hidden layers.
     for l in range(depth):
@@ -42,7 +44,9 @@ def build_model_regression(num_features, depth, input_layer_width, hidden_layers
     model = keras.models.Sequential()
     
     # Input layer.
-    model.add(keras.layers.Dense(input_layer_width, input_dim = num_features, activation = "relu")) 
+    # model.add(keras.layers.Dense(input_layer_width, input_dim = num_features, activation = "relu"))
+    model.add(keras.Input(shape=(num_features,)))
+    model.add(keras.layers.Dense(input_layer_width, activation="relu"))
     
     # Hidden layers.
     for l in range(depth):
@@ -66,7 +70,8 @@ def tune_hyperparameters(data_train, labels_train, min_depth = 1, max_depth = 5)
     if "int" in str(type(labels_train[0])) or "str" in str(type(labels_train[0])):
         problem = "classification"
         num_classes = len(np.unique(labels_train))
-        nn_deep = KerasClassifier(build_fn = build_model_classification, 
+        # nn_deep = KerasClassifier(build_fn = build_model_classification,
+        nn_deep = KerasClassifier(model = build_model_classification,
                                   epochs = 2, 
                                   verbose = 0,
                                   num_features = num_features, 
@@ -74,7 +79,8 @@ def tune_hyperparameters(data_train, labels_train, min_depth = 1, max_depth = 5)
     # Regression problem.
     else:
         problem = "regression"
-        nn_deep = KerasRegressor(build_fn = build_model_regression, 
+        # nn_deep = KerasRegressor(build_fn = build_model_regression,
+        nn_deep = KerasRegressor(model = build_model_regression,
                                  epochs = 2, 
                                  verbose = 0,
                                  num_features = num_features)
@@ -88,18 +94,18 @@ def tune_hyperparameters(data_train, labels_train, min_depth = 1, max_depth = 5)
     print("depths = ", depths)
     print("layer_width = ", widths)
     print("learning_rates = ", learning_rates)    
-    param_grid = {"depth": depths,
-                  "input_layer_width": widths,
-                  "hidden_layers_width": widths,
-                  "learning_rate": learning_rates}    
+    param_grid = {"model__depth": depths,
+                  "model__input_layer_width": widths,
+                  "model__hidden_layers_width": widths,
+                  "model__learning_rate": learning_rates}
     best_nn_deep, grid_search = model.grid_search(data_train, labels_train, param_grid, nn_deep) 
     
     # Do not return KerasClassifier instance, since fit() will then always build a NEW MODEL to train.
     # We need to return Keras model instance with the best parameters.)        
-    depth_best = grid_search.best_params_["depth"]
-    input_layer_width_best = grid_search.best_params_["input_layer_width"]
-    hidden_layers_width_best = grid_search.best_params_["hidden_layers_width"]
-    learning_rate_best = grid_search.best_params_["learning_rate"]
+    depth_best = grid_search.best_params_["model__depth"]
+    input_layer_width_best = grid_search.best_params_["model__input_layer_width"]
+    hidden_layers_width_best = grid_search.best_params_["model__hidden_layers_width"]
+    learning_rate_best = grid_search.best_params_["model__learning_rate"]
 
     if problem == "classification":
         best_nn_deep = build_model_classification(num_features, num_classes, depth_best, input_layer_width_best, hidden_layers_width_best, learning_rate_best)

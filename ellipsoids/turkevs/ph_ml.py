@@ -12,9 +12,9 @@ import sys
 
 sys.path.append(os.path.abspath('.'))
 
-import ellipsoids.turkevs.model
-import ellipsoids.turkevs.ph
-import ellipsoids.turkevs.data_construction
+import ellipsoids.turkevs.model as model
+import ellipsoids.turkevs.ph as ph
+import ellipsoids.turkevs.data_construction as data_construction
 
 
 

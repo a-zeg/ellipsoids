@@ -286,7 +286,7 @@ def test_dataset():
     target_n_points = 3
     target_ambient_dim = 2
 
-    print(dataset.n_points())
+    print(dataset.n_points)
 
-    assert dataset.n_points() == target_n_points
-    assert dataset.ambient_dim() == target_ambient_dim
+    assert dataset.n_points == target_n_points
+    assert dataset.ambient_dim == target_ambient_dim

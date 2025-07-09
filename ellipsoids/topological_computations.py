@@ -2,7 +2,9 @@ import json
 import os
 import time
 import typing
+from typing import Optional
 from enum import Enum
+import logging
 
 import numpy as np
 import gudhi as gd
@@ -24,35 +26,53 @@ from ellipsoids.common import EllipsoidResults
 from ellipsoids.common import Ellipsoid
 from ellipsoids.common import ConversionType
 from ellipsoids.common import convert
+from ellipsoids.common import spherisize_axes
+
+logger = logging.getLogger(__name__)
 
 
 
-def fit_ellipsoid(center: np.ndarray, nbhd_pts: np.ndarray, axes_ratios: np.ndarray) -> Ellipsoid:
+def fit_ellipsoid(center: np.ndarray,
+                  nbhd_pts: np.ndarray,
+                  axes_ratios: Optional[np.ndarray] = None,
+                  min_axes_length: Optional[float] = 1e-4) -> Ellipsoid:
     ''' Use PCA to fit an ellipsoid to the given neighbourhood
     :return: ellipsoid of dimension dim with axes obtained from PCA
     '''
     pca = PCA(n_components=len(center))
     pca.fit(nbhd_pts)
     axes = pca.components_
-    axes_lengths = pca.singular_values_
 
-    if axes_ratios.all() != 0:
-        axes_lengths = axes_ratios / axes_ratios[0] # r determines the long axis (normalising the long axis to 1)
-        # axesLengths = axesRatios / axesRatios[-1] # alt: r determines the short axis
-    else: 
-        exit("Error: axes ratios contain a zero.")
+
+    if axes_ratios is None:
+        singular_values = pca.singular_values_
+
+        if np.any(np.isnan(singular_values)):
+            logger.warning("NaNs in the PCA axes lengths - setting all axes_lengths to 1.")
+            axes_lengths = np.ones(len(axes))
+
+        else:
+            axes_lengths = singular_values / singular_values[0]
+            axes_lengths = np.maximum(axes_lengths, min_axes_length)
+
+    else:
+        if axes_ratios.all() != 0:
+            axes_lengths = axes_ratios / axes_ratios[0] # r determines the long axis (normalising the long axis to 1)
+        else:
+            raise ValueError("Invalid axes_ratios: axes_ratios may not contain a zero.")
+
     return Ellipsoid(center, axes, axes_lengths)
 
 
 
-def fit_ellipsoids(points, neighbourhood_size, axes_ratios) -> list[Ellipsoid]:
-    print('Creating KD tree... ', end='', flush=True)
+def fit_ellipsoids(points: np.ndarray, neighbourhood_size: int, axes_ratios: Optional[np.ndarray] = None) -> list[Ellipsoid]:
+    logger.info('Creating KD tree... ')
     kdTree = spatial.KDTree(points)
-    print('Done.')
-    print('Fitting ellipsoids... ', end='', flush=True)
+    logger.info('KD tree created.')
+    logger.info('Fitting ellipsoids... ')
 
     if len(points) < neighbourhood_size:
-        print('WARNING: the chosen neighbourhood size is too small. \
+        logger.warning('WARNING: the chosen neighbourhood size is too small. \
               Setting the neighbhourhood size to the total number of points.')
         neighbourhood_size = len(points)
 
@@ -60,54 +80,54 @@ def fit_ellipsoids(points, neighbourhood_size, axes_ratios) -> list[Ellipsoid]:
     neighbourhoods = points[neighbourhood_idx]
     ellipsoid_list \
         = [fit_ellipsoid(point, neighbourhood, axes_ratios) for point,neighbourhood in zip(points, neighbourhoods)]
-    print('Done.')
+    logger.info('Fitting ellipsoids completed.')
 
     return ellipsoid_list
 
 
 
-def spherisize(axes_lengths: np.ndarray, s:float=0):
-    '''
-    Returns axes lengths of a "spherisized" ellipsoid.
-    For s=0, the function will output axes_lengths and for s=1 all elements of axes_lengths
-    will be equal to the longest one.
+# def spherisize(axes_lengths: np.ndarray, s:float=0):
+#     '''
+#     Returns axes lengths of a "spherisized" ellipsoid.
+#     For s=0, the function will output axes_lengths and for s=1 all elements of axes_lengths
+#     will be equal to the longest one.
 
-    For example, for axes_ratios=np.array([3,2,1]), we get:
-    - s=0: np.array([3,2,1])
-    - s=0.5: np.array([3,2.5,2])
-    - s=1: np.array([3,3,3])
-    '''
+#     For example, for axes_ratios=np.array([3,2,1]), we get:
+#     - s=0: np.array([3,2,1])
+#     - s=0.5: np.array([3,2.5,2])
+#     - s=1: np.array([3,3,3])
+#     '''
 
-    major_axis = np.max(axes_lengths)
-    spherisized_axes_lengths = np.zeros(np.size(axes_lengths))
-    for idx, axis in enumerate(axes_lengths):
-        spherisized_axes_lengths[idx] = s*major_axis + (1-s)*axis
-    return spherisized_axes_lengths
-
-
-
-def scale_to_01(x: float, min: float = 0, max: float = 1):
-    '''
-    Scales the input x in the interval [min, max] to the interval [0,1]
-    If x is bigger than max, returns 1.
-    If x is smaller than min, returns 0.
-    '''
-    if x > max:
-        return 1
-    elif x < min:
-        return 0
-    else:
-        return (x-min)/(max-min)
+#     major_axis = np.max(axes_lengths)
+#     spherisized_axes_lengths = np.zeros(np.size(axes_lengths))
+#     for idx, axis in enumerate(axes_lengths):
+#         spherisized_axes_lengths[idx] = s*major_axis + (1-s)*axis
+#     return spherisized_axes_lengths
 
 
 
-def spherisize_axes(axes_lengths: np.ndarray, r: float, r_spherisize: float = 10):
-    '''
-    At r=0 should have axes_ratio from the start.
-    At r=r_spherisize, should get balls.
-    '''
+# def scale_to_01(x: float, min: float = 0, max: float = 1):
+#     '''
+#     Scales the input x in the interval [min, max] to the interval [0,1]
+#     If x is bigger than max, returns 1.
+#     If x is smaller than min, returns 0.
+#     '''
+#     if x > max:
+#         return 1
+#     elif x < min:
+#         return 0
+#     else:
+#         return (x-min)/(max-min)
 
-    return spherisize(axes_lengths, scale_to_01(r,max=r_spherisize))
+
+
+# def spherisize_axes(axes_lengths: np.ndarray, r: float, r_spherisize: float = 10):
+#     '''
+#     At r=0 should have axes_ratio from the start.
+#     At r=r_spherisize, should get balls.
+#     '''
+
+#     return spherisize(axes_lengths, scale_to_01(r,max=r_spherisize))
 
 
 
@@ -126,14 +146,8 @@ def _ellipsoid_intersection(center_1: np.ndarray, axes_lengths_1: np.ndarray, ax
     i.e. this paper: https://tisl.cs.toronto.edu/publication/201207-fusion-kalman_filter_fault_detection/fusion12-kalman_filter_fault_detection.pdf
     :return: true or false
     '''
-    Sigma_A = np.linalg.multi_dot([\
-        np.transpose(axes_1),\
-        np.diag(axes_lengths_1**2),\
-        axes_1])
-    Sigma_B = np.linalg.multi_dot([\
-        np.transpose(axes_2),\
-        np.diag(axes_lengths_2**2),\
-        axes_2])
+    Sigma_A = axes_1.T @ np.diag(axes_lengths_1**2) @ axes_1
+    Sigma_B = axes_2.T @ np.diag(axes_lengths_2**2) @ axes_2
     mu_A = center_1
     mu_B = center_2
 
@@ -142,7 +156,7 @@ def _ellipsoid_intersection(center_1: np.ndarray, axes_lengths_1: np.ndarray, ax
     res = minimize_scalar(K,
                           bracket=[0.0, 0.5, 1.0],
                           args=(lambdas, v_squared, r))
-    return (res.fun >= 0)
+    return res.fun >= 0
 
 
 
@@ -167,6 +181,34 @@ def ellipsoid_intersection(ellipsoid_1: Ellipsoid,
 
 
 
+def ellipsoid_intersection_cached(
+        ellipsoid_1: Ellipsoid,
+        ellipsoid_2: Ellipsoid,
+        r: float,
+        r_spherisize: float = np.inf
+        ):
+    ''' Checks whether ellipsoid_1 and ellipsoid_2 at the filtration level r intersect.
+    If r_spherisize is not infinite, the axes_lengths will be linearly adapted so that
+    for filtrations above spherisize_filtration, the ellipsoids become spheres
+    '''
+
+    if ellipsoid_1 == ellipsoid_2:
+        return True
+
+    Sigma_A = ellipsoid_1.get_sigma(r, r_spherisize)
+    Sigma_B = ellipsoid_2.get_sigma(r, r_spherisize)
+    mu_A = ellipsoid_1.center
+    mu_B = ellipsoid_2.center
+
+    lambdas, Phi = eigh(Sigma_A, b=Sigma_B)
+    v_squared = np.dot(Phi.T, mu_A - mu_B) ** 2
+    res = minimize_scalar(K,
+                          bracket=[0.0, 0.5, 1.0],
+                          args=(lambdas, v_squared, r))
+    return res.fun >= 0
+
+
+
 def get_max_axes_ratio(ellipsoid: Ellipsoid):
     max_axis_length = max(ellipsoid.axes_lengths)
     min_axis_length = min(ellipsoid.axes_lengths)
@@ -175,45 +217,53 @@ def get_max_axes_ratio(ellipsoid: Ellipsoid):
 
 
 
-def find_intersection_radius(ellipsoid_1: Ellipsoid,
-                           ellipsoid_2: Ellipsoid,
-                           threshold = 0.001,
-                           epsilon = 0.001,
-                           r_spherisize: float = np.inf):
+def find_intersection_radius(
+        ellipsoid_1: Ellipsoid,
+        ellipsoid_2: Ellipsoid,
+        threshold = 0.001,
+        epsilon = 0.001,
+        r_spherisize: float = np.inf,
+        use_cache: bool = True
+        ):
 
     dist = np.linalg.norm(ellipsoid_1.center - ellipsoid_2.center)
     max_axes_ratio = max(get_max_axes_ratio(ellipsoid_1), get_max_axes_ratio(ellipsoid_2))
-    maxNonIntersectionFiltration = (dist / 2) - epsilon
-    minIntersectionFiltration = dist/2 * max_axes_ratio + epsilon
-    r = (minIntersectionFiltration - maxNonIntersectionFiltration)/2
+    lower_bound_r = (dist / 2) - epsilon              # maximum filtration at which ellipsoids can not intersect
+    upper_bound_r = dist/2 * max_axes_ratio + epsilon # minimum filtration at which ellipsoids can intersect
+    r = (upper_bound_r - lower_bound_r)/2
+
+    intersection_fn = (
+        ellipsoid_intersection_cached if use_cache
+        else ellipsoid_intersection
+        )
 
     while True:
-        if ellipsoid_intersection(ellipsoid_1, ellipsoid_2, r, r_spherisize):
-            minIntersectionFiltration = r
-        else: maxNonIntersectionFiltration = r
+        if intersection_fn(ellipsoid_1, ellipsoid_2, r, r_spherisize):
+            upper_bound_r = r
+        else: lower_bound_r = r
 
-        if (minIntersectionFiltration - maxNonIntersectionFiltration) < threshold:
+        if (upper_bound_r - lower_bound_r) < threshold:
             return r
-        else: r = (minIntersectionFiltration + maxNonIntersectionFiltration)/2
+        else: r = (upper_bound_r + lower_bound_r)/2
 
 
 
-def wrapper_find_intersection_radius(ellipsoid_1, ellipsoid_2, r_spherisize: float):
+def wrapper_find_intersection_radius(ellipsoid_1, ellipsoid_2, r_spherisize: float, use_cache: bool):
     '''
     Wrapper that allows for an additional (non-keyword) argument.
     Necessary to divide tasks into multiple cores for multiprocessing.
     '''
-    return find_intersection_radius(ellipsoid_1, ellipsoid_2, r_spherisize = r_spherisize)
+    return find_intersection_radius(ellipsoid_1, ellipsoid_2, r_spherisize=r_spherisize, use_cache=use_cache)
 
 
 
-
-
-
-def generate_ELLIPSOID_RIPS_simplex_tree(points: np.ndarray,
-                                  nbhd_size: int,
-                                  axes_ratios: np.ndarray,
-                                  r_spherisize: float = np.inf):
+def generate_ELLIPSOID_RIPS_simplex_tree(
+        points: np.ndarray,
+        nbhd_size: int,
+        axes_ratios: Optional[np.ndarray] = None,
+        r_spherisize: float = np.inf,
+        use_cache: bool = True,
+        ):
     ''' multiprocessing '''
     ''' Creates a simplex tree from the ellipsoids by adding an edge between each two points whose 
     corresponding ellipsoids intersect.
@@ -227,7 +277,7 @@ def generate_ELLIPSOID_RIPS_simplex_tree(points: np.ndarray,
 
     ellipsoidList = fit_ellipsoids(points, nbhd_size, axes_ratios)
 
-    print('Calculating ellipsoid simplex tree... ', end='', flush=True)
+    logger.info('Calculating ellipsoid simplex tree... ')
 
     simplexTree = gd.SimplexTree()
     [simplexTree.insert([i],0) for i in np.arange(len(points))]
@@ -235,56 +285,17 @@ def generate_ELLIPSOID_RIPS_simplex_tree(points: np.ndarray,
     pairs = np.array([[i,j] for i in np.arange(len(points)) for j in np.arange(i+1,len(points))])
     tasks = zip([ellipsoidList[i] for i in pairs[:,0]], \
                 [ellipsoidList[j] for j in pairs[:,1]])
-    tasks = [(*x, r_spherisize) for x in tasks]
+    tasks = [(*x, r_spherisize, use_cache) for x in tasks]
 
-    cpuCores = int(os.environ.get("SLURM_NTASKS", 4))
+    cpuCores = int(os.environ.get("SLURM_NTASKS", cpu_count()))
     with Pool(cpuCores) as p:
         radii = list(p.starmap(wrapper_find_intersection_radius, tasks))
 
     filtrations = [convert(r, ConversionType.RADIUS_TO_RIPS) for r in radii]
     [simplexTree.insert(pair,f) for pair, f in zip(pairs,filtrations)]
 
-    print('Done.\n')
+    logger.info('Ellipsoid simplex tree calculated.')
     return [simplexTree, ellipsoidList]
-
-
-
-# def adjacent_voronoi_vertices(vertex, vor: Voronoi):
-#     adjacents = []
-#     for ridge_idx, ridge in enumerate(vor.ridge_vertices):
-#         if vertex in ridge:
-#             adjacents.extend(vor.ridge_points[ridge_idx])
-#     return list(set(adjacents))
-
-
-
-# def generate_alpha_ellipsoid_simplex_tree_old(dataset: Dataset,
-#                                           ellipsoid_parameters: EllipsoidParameters):
-#     points = dataset.points
-#     nbhd_size = ellipsoid_parameters.nbhd_size
-#     axes_ratios = ellipsoid_parameters.axes_ratios
-#     r_spherisize = ellipsoid_parameters.r_spherisize
-
-#     ellipsoid_list: list[Ellipsoid] = fit_ellipsoids(points, nbhd_size, axes_ratios)
-
-#     print('Calculating alpha ellipsoid simplex tree... ', end='', flush=True)
-
-#     simplex_tree = gd.SimplexTree()
-#     [simplex_tree.insert([i],0) for i in np.arange(len(points))]
-
-#     vor = Voronoi(points)
-#     for vertex, _ in enumerate(vor.vertices):
-#         adjacents = adjacent_voronoi_vertices(vertex, vor)
-
-#         for i, vertex_i in enumerate(adjacents):
-#             for _, vertex_j in enumerate(adjacents[i+1:], start=i+1):
-#                 intersection_radius = find_intersection_radius(ellipsoid_list[vertex_i],
-#                                                                ellipsoid_list[vertex_j],
-#                                                                r_spherisize=r_spherisize)
-#                 simplex_tree.insert([vertex_i,vertex_j], intersection_radius)
-
-#     print('Done.\n')
-#     return [simplex_tree, ellipsoid_list]
 
 
 
@@ -299,11 +310,16 @@ def adjacent_delaunay_vertices(triangulation, vertex_index):
 
 
 
-def generate_ELLIPSOID_ALPHA_simplex_tree(points: np.ndarray, nbhd_size: int, axes_ratios: np.ndarray, r_spherisize: float):
-
+def generate_ELLIPSOID_ALPHA_simplex_tree(
+        points: np.ndarray,
+        nbhd_size: int,
+        axes_ratios: Optional[np.ndarray],
+        r_spherisize: float,
+        use_cache: bool,
+        ):
     ellipsoid_list: list[Ellipsoid] = fit_ellipsoids(points, nbhd_size, axes_ratios)
 
-    print('Calculating ELLIPSOID ALPHA simplex tree... ', end='', flush=True)
+    logger.info("Calculating ELLIPSOID ALPHA simplex tree... ")
 
     simplex_tree = gd.SimplexTree()
     [simplex_tree.insert([i],0) for i in np.arange(len(points))]
@@ -317,61 +333,45 @@ def generate_ELLIPSOID_ALPHA_simplex_tree(points: np.ndarray, nbhd_size: int, ax
             vertex_j = adjacent_vertex
 
             if not simplex_tree.find([vertex_i, vertex_j]):
-                intersection_radius = find_intersection_radius(ellipsoid_list[vertex_i],
-                                                                ellipsoid_list[vertex_j],
-                                                                r_spherisize=r_spherisize)
+                intersection_radius = find_intersection_radius(
+                    ellipsoid_list[vertex_i],
+                    ellipsoid_list[vertex_j],
+                    r_spherisize=r_spherisize,
+                    use_cache=use_cache,
+                    )
                 filtration = convert(intersection_radius, ConversionType.RADIUS_TO_ALPHA)
                 simplex_tree.insert([vertex_i,vertex_j], filtration)
 
-    print('Done.\n')
+    logger.info("Simplex tree calculated.")
     return [simplex_tree, ellipsoid_list]
 
 
 
 def expand_simplex_tree(simplex_tree, expansion_dim=2):
-    print("Expanding the simplex tree...", end="", flush=True)
+    logger.info("Expanding the simplex tree...")
     simplex_tree.expansion(expansion_dim)
-    print("Done.")
+    logger.info("Simplex tree expanded.")
     return simplex_tree
 
 
 
 def collapse_edges(simplex_tree):
-    print('Collapsing edges...', end='', flush=True)
+    logger.info("Collapsing edges...")
     simplex_tree.collapse_edges()
-    print('Done.')
+    logger.info("Edges collapsed.")
     return simplex_tree
-
-
-
-# def generate_ellipsoid_simplex_tree__single_process(points: np.ndarray, nbhd_size: int, axes_ratios: np.ndarray, r_spherisize: float = np.inf):
-
-#     ellipsoidList: list[Ellipsoid] = fit_ellipsoids(points, nbhd_size, axes_ratios)
-
-#     print('Calculating ellipsoid simplex tree... ', end='', flush=True)
-
-#     simplexTree = gd.SimplexTree()
-#     [simplexTree.insert([i],0) for i in np.arange(len(points))] #TODO check if the whole array can be assigned
-
-#     for i, ellipsoid1 in enumerate(ellipsoidList):
-#         for j, ellipsoid2 in enumerate(ellipsoidList[i:]):
-#             intersection_radius = find_intersection_radius(ellipsoid1, ellipsoid2)
-#             simplexTree.insert([i, j+i], intersection_radius)
-
-#     print('Done.')
-#     return [simplexTree, ellipsoidList]
 
 
 
 def generate_BALL_RIPS_simplex_tree(points, max_dimension=1):
 
-    print('Creating the Rips complex... ', end='', flush=True)
+    logger.info("Creating the Rips complex... ")
     rips_complex = gd.RipsComplex(points=points)
-    print('Done.')
+    logger.info("Rips complex created.")
 
-    print('Creating the Rips simplex tree... ', end='', flush=True)
+    logger.info("Creating the Rips simplex tree...")
     simplex_tree = rips_complex.create_simplex_tree(max_dimension=max_dimension)
-    print('Done.')
+    logger.info("Simplex tree created.")
 
     return simplex_tree
 
@@ -379,56 +379,30 @@ def generate_BALL_RIPS_simplex_tree(points, max_dimension=1):
 
 def double_filtrations(simplex_tree):
     for simplex in simplex_tree.get_simplices():
-
         simplex_set = simplex[0]  # Get the simplex (set of vertices)
         filtration_value = simplex[1]  # Get the current filtration value
         simplex_tree.assign_filtration(simplex_set, 2*filtration_value)
-
     return simplex_tree
 
 
 
 def generate_BALL_ALPHA_simplex_tree(points):
-
-    print('Creating the alpha complex... ', end='', flush=True)
+    logger.info("Creating the alpha complex...")
     alpha_complex = gd.AlphaComplex(points=points)
-    print('Done.')
+    logger.info("Alpha complex created.")
 
-    print('Creating the alpha simplex tree... ', end='', flush=True)
+    logger.info("Creating the alpha simplex tree...")
     simplex_tree = alpha_complex.create_simplex_tree()
-    print('Done.')
+    logger.info("Alpha simplex tree created.")
 
     return simplex_tree
 
 
 
-
-# def calculate_barcode(simplex_tree, expansion_dim=2, collapse_edges=False):
-#     # simplexTreeExpanded = simplexTree.copy()
-#     # if collapse_edges:
-#     #     print('Collapsing edges...', end='', flush=True)
-#     #     simplexTreeExpanded.collapse_edges()
-#     #     print('Done.')
-
-#     # print('Expanding the simplex tree... ', end='', flush=True)
-#     # simplexTreeExpanded.expansion(expansion_dim) # expands the simplicial complex to include
-#     #                                             # dim-dimensional simplices whose 1-skeleton is in simplexTree
-#     # print('Done.')
-
-#     # print('Calculating the barcode of the expanded tree... ', end='', flush=True)
-#     # barcode = simplexTreeExpanded.persistence()
-#     # print('Done.\n')
-#     print('Calculating the barcode of the expanded tree... ', end='', flush=True)
-#     barcode = simplex_tree.persistence()
-#     print('Done.\n')
-
-#     return barcode
-
-
 def calculate_barcode(simplex_tree):
-    print('Calculating the barcode of the expanded tree... ', end='', flush=True)
+    logger.info("Calculating the barcode of the expanded tree...")
     barcode = simplex_tree.persistence()
-    print('Done.\n')
+    logger.info("Barcode calculated.")
     return barcode
 
 
@@ -448,38 +422,26 @@ def set_max_bar_end(bar, max_bar_end):
 
 
 
-def reduce_barcode(barcode, nBarsDim0 = 10, nBarsDim1 = 10, nBarsDim2 = 10):
-    # return only the first nBarsDimk bars in each dimension k
-    reduced_barcode = []
-    max_bar_end = 0
-    for bar in barcode:
-        if bar[0] == 0 and nBarsDim0 > 0:
-            reduced_barcode.append(bar)
-            nBarsDim0 = nBarsDim0 - 1
-            max_bar_end = set_max_bar_end(bar, max_bar_end)
-        elif bar[0] == 1 and nBarsDim1 > 0:
-            reduced_barcode.append(bar)
-            nBarsDim1 = nBarsDim1 - 1
-            max_bar_end = set_max_bar_end(bar, max_bar_end)
-        elif bar[0] == 2 and nBarsDim2 > 0:
-            reduced_barcode.append(bar)
-            nBarsDim2 = nBarsDim2 - 1
-            max_bar_end = set_max_bar_end(bar, max_bar_end)
+# def reduce_barcode(barcode, nBarsDim0 = 10, nBarsDim1 = 10, nBarsDim2 = 10):
+#     # return only the first nBarsDimk bars in each dimension k
+#     reduced_barcode = []
+#     max_bar_end = 0
+#     for bar in barcode:
+#         if bar[0] == 0 and nBarsDim0 > 0:
+#             reduced_barcode.append(bar)
+#             nBarsDim0 = nBarsDim0 - 1
+#             max_bar_end = set_max_bar_end(bar, max_bar_end)
+#         elif bar[0] == 1 and nBarsDim1 > 0:
+#             reduced_barcode.append(bar)
+#             nBarsDim1 = nBarsDim1 - 1
+#             max_bar_end = set_max_bar_end(bar, max_bar_end)
+#         elif bar[0] == 2 and nBarsDim2 > 0:
+#             reduced_barcode.append(bar)
+#             nBarsDim2 = nBarsDim2 - 1
+#             max_bar_end = set_max_bar_end(bar, max_bar_end)
+
+#     return reduced_barcode, max_bar_end
     
-    return reduced_barcode, max_bar_end
-    
-
-
-# def calculateBottleeckDistance(barcode1, barcode2, dim):
-#     npBarcode1 = np.array()
-#     npBarcode2 = np.array()
-#     for line in barcode1:
-#         npBarcode1[line[0]].append(line[1])
-#     for line in barcode2:
-#         npBarcode2[line[0]].append(line[1])
-
-#     bottleneckDistance = [gd.bottleneck_distance(i,j) for i,j in zip(npBarcode1, npBarcode2)]
-#     return bottleneckDistance
 
 
 def set_axes_ratios_to_tangent(axes_ratios: np.ndarray, dim: int, manifold_dim: int):
@@ -498,66 +460,10 @@ def pad_axes_ratios(axesRatios: np.ndarray, dim: int):
 
 
 
-# def calculate_ellipsoid_barcode(points: np.ndarray,
-#                                 nbhd_size: int,
-#                                 axes_ratios: np.ndarray,
-#                                 expansion_dim: int = 2,
-#                                 collapse_edges: bool = True,
-#                                 r_spherisize: float = np.inf):
-#     '''
-#     Calculate ellipsoid barcode from given points
-
-#         Arguments:
-#             points (np.array): array of points
-#             nbhd_size (int): size of the neighbourhood for PCA when fitting ellipsoids
-#             axes_ratios: ratios of axes of ellipsoids (from largest to smallest - last one has to be 1).
-#                 It is sufficient to specify only the non-1 entries, as the rest will be padded with 1's
-#                 to ensure the correct dimensionality.
-#             expansion_dim (int): [gudhi parameter] dimension to which to expand simplex tree.
-#                 If expansion_dim = n, then only n- and lower-dimensional features will be captured.
-#             collapse_edges (bool): [gudhi parameter] collapse edges that do not affect the result
-#                 for faster computation
-
-#         Returns:
-#             barcode ():
-#             simplex_tree ():
-#             ellipsoid_list (list[Ellipsoids]): list of ellipsoids
-#             total_time (int): total execution time in seconds
-#     '''
-#     dim = len(points[0])
-#     axes_ratios = pad_axes_ratios(axes_ratios,dim)
-
-#     t0_simplex_tree = time.time()
-#     [simplex_tree, ellipsoid_list] = generate_ELLIPSOID_RIPS_simplex_tree(points, nbhd_size, axes_ratios, r_spherisize)
-#     t1_simplex_tree = time.time()
-
-#     t0_barcode = time.time()
-#     barcode = calculate_barcode(simplex_tree, expansion_dim, collapse_edges=collapse_edges)
-#     t1_barcode = time.time()
-
-#     total_time = t1_barcode - t0_barcode + t1_simplex_tree - t0_simplex_tree
-
-#     return barcode, simplex_tree, ellipsoid_list, total_time
-
-
-
-# def calculate_rips_barcode(points: np.ndarray, expansion_dim=2, collapse_edges=True):
-
-#     t0_simplex_tree = time.time()
-#     simplex_tree = generate_BALL_RIPS_simplex_tree(points)
-#     t1_simplex_tree = time.time()
-
-#     t0_barcode = time.time()
-#     barcode = calculate_barcode(simplex_tree, expansion_dim, collapse_edges=collapse_edges)
-#     t1_barcode = time.time()
-
-#     total_time = t1_barcode - t0_barcode + t1_simplex_tree - t0_simplex_tree
-
-#     return barcode, simplex_tree, total_time
-
-
-
-def calculate_BALL_Results(dataset: Dataset, parameters: Parameters) -> Results:
+def calculate_BALL_Results(
+        dataset: Dataset,
+        parameters: Parameters
+        ) -> Results:
 
     t0_simplex_tree = time.time()
     if parameters.complex_subtype == ComplexSubtype.RIPS:
@@ -566,12 +472,12 @@ def calculate_BALL_Results(dataset: Dataset, parameters: Parameters) -> Results:
         simplex_tree = generate_BALL_ALPHA_simplex_tree(dataset.points)
     else:
         exit(f"{parameters.complex_subtype} is an invalid complex type.")
-    t1_simplex_tree = time.time()
 
     if parameters.collapse_edges:
         collapse_edges(simplex_tree)
     if parameters.expansion_dim > 1:
         expand_simplex_tree(simplex_tree, expansion_dim=parameters.expansion_dim)
+    t1_simplex_tree = time.time()
 
     t0_barcode = time.time()
     barcode = calculate_barcode(simplex_tree)
@@ -588,26 +494,49 @@ def calculate_BALL_Results(dataset: Dataset, parameters: Parameters) -> Results:
 
 
 
-def calculate_ELLIPSOID_Results(dataset: Dataset, ellipsoid_parameters: EllipsoidParameters) -> EllipsoidResults:
+def calculate_ELLIPSOID_Results(
+        dataset: Dataset,
+        ellipsoid_parameters: EllipsoidParameters
+        ) -> EllipsoidResults:
 
-    ambient_dim = dataset.ambient_dim()
-    # axes_ratios = pad_axes_ratios(ellipsoid_parameters.axes_ratios, dim)
-    axes_ratios = set_axes_ratios_to_tangent(ellipsoid_parameters.axes_ratios, ambient_dim, ambient_dim-1)
+    ambient_dim = dataset.ambient_dim
+    if ellipsoid_parameters.axes_ratios is None:
+        axes_ratios = None
+    else:
+        axes_ratios = set_axes_ratios_to_tangent(
+            ellipsoid_parameters.axes_ratios,
+            ambient_dim,
+            ambient_dim-1)
     points = dataset.points
     nbhd_size = ellipsoid_parameters.nbhd_size
     r_spherisize = ellipsoid_parameters.r_spherisize
+    use_cache = ellipsoid_parameters.use_cache
 
     t0_simplex_tree = time.time()
     if (ellipsoid_parameters.complex_subtype == ComplexSubtype.ALPHA):
-        simplex_tree, ellipsoid_list = generate_ELLIPSOID_ALPHA_simplex_tree(points, nbhd_size, axes_ratios, r_spherisize)
+        simplex_tree, ellipsoid_list = generate_ELLIPSOID_ALPHA_simplex_tree(
+            points=points,
+            nbhd_size=nbhd_size,
+            axes_ratios=axes_ratios,
+            r_spherisize=r_spherisize,
+            use_cache=use_cache,
+            )
+    elif ellipsoid_parameters.complex_subtype == ComplexSubtype.RIPS:
+        [simplex_tree, ellipsoid_list] = generate_ELLIPSOID_RIPS_simplex_tree(
+            points=points,
+            nbhd_size=nbhd_size,
+            axes_ratios=axes_ratios,
+            r_spherisize=r_spherisize,
+            use_cache=use_cache,
+            )
     else:
-        [simplex_tree, ellipsoid_list] = generate_ELLIPSOID_RIPS_simplex_tree(points, nbhd_size, axes_ratios, r_spherisize)
-    t1_simplex_tree = time.time()
+        raise ValueError(f"{ellipsoid_parameters.complex_subtype} is an invalid complex subtype.")
 
     if ellipsoid_parameters.collapse_edges:
         collapse_edges(simplex_tree)
     if ellipsoid_parameters.expansion_dim > 1:
         expand_simplex_tree(simplex_tree, expansion_dim=ellipsoid_parameters.expansion_dim)
+    t1_simplex_tree = time.time()
 
     t0_barcode = time.time()
     barcode = calculate_barcode(simplex_tree)

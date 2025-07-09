@@ -2,16 +2,59 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Optional, Any
 from datetime import datetime
-import json
 import os
+import json
+import hashlib
 
 import numpy as np
 import gudhi as gd
 
 
 
+def spherisize(axes_lengths: np.ndarray, s:float=0):
+    '''
+    Returns axes lengths of a "spherisized" ellipsoid.
+    For s=0, the function will output axes_lengths and for s=1 all elements of axes_lengths
+    will be equal to the longest one.
 
-def restore_numpy_array(field_data: any) -> np.ndarray:
+    For example, for axes_ratios=np.array([3,2,1]), we get:
+    - s=0: np.array([3,2,1])
+    - s=0.5: np.array([3,2.5,2])
+    - s=1: np.array([3,3,3])
+    '''
+
+    major_axis = np.max(axes_lengths)
+    spherisized_axes_lengths = np.zeros(np.size(axes_lengths))
+    for idx, axis in enumerate(axes_lengths):
+        spherisized_axes_lengths[idx] = s*major_axis + (1-s)*axis
+    return spherisized_axes_lengths
+
+
+
+def scale_to_01(x: float, min: float = 0, max: float = 1):
+    '''
+    Scales the input x in the interval [min, max] to the interval [0,1]
+    If x is bigger than max, returns 1.
+    If x is smaller than min, returns 0.
+    '''
+    if x > max:
+        return 1
+    elif x < min:
+        return 0
+    else:
+        return (x-min)/(max-min)
+
+
+
+def spherisize_axes(axes_lengths: np.ndarray, r: float, r_spherisize: float = 10):
+    '''
+    At r=0 should have axes_ratio from the start.
+    At r=r_spherisize, should get balls.
+    '''
+
+    return spherisize(axes_lengths, scale_to_01(r,max=r_spherisize))
+
+def restore_numpy_array(field_data: Any) -> Optional[np.ndarray]:
     """
     Restores a NumPy array from a list (if necessary) or returns the original data.
 
@@ -21,6 +64,8 @@ def restore_numpy_array(field_data: any) -> np.ndarray:
     Returns:
         np.ndarray: The restored NumPy array.
     """
+    if field_data is None:
+        return None
     if isinstance(field_data, list):
         return np.array(field_data)
     return field_data
@@ -31,6 +76,7 @@ class Ellipsoid:
         self.center = center
         self.axes = axes
         self.axes_lengths = axes_lengths
+        self._cached_sigma = None
 
     def __eq__(self, other):
         if isinstance(other, Ellipsoid):
@@ -38,6 +84,15 @@ class Ellipsoid:
                     np.array_equal(self.axes, other.axes) and
                     np.array_equal(self.axes_lengths, other.axes_lengths))
         return False
+
+    def get_sigma(self, r: float, r_spherisize: float):
+        if r_spherisize == np.inf:
+            if self._cached_sigma is None:
+                self._cached_sigma = self.axes.T @ np.diag(self.axes_lengths ** 2) @ self.axes
+            return self._cached_sigma
+        else:
+            lengths = spherisize_axes(self.axes_lengths, r, r_spherisize)
+            return self.axes.T @ np.diag(lengths**2) @ self.axes
 
     def to_dict(self):
         obj_data = {
@@ -77,23 +132,29 @@ class TurkevsTransformation(Enum):
     def from_shortname(cls, shortname: str):
         return next(t for t in cls if t.shortname == shortname)
 
+    @classmethod
+    def shortnames(cls):
+        return [t.shortname for t in cls]
+
 
 
 @dataclass
 class TurkevsDatasetInfo:
-    dataset_id: Optional[str]              # seed / batch id (only needed when writing to file)
+    dataset_id: Optional[str]
     seed: int
-    mesh_index: int
+    point_cloud_index: int
     transformation: TurkevsTransformation
     label: str                             # label for classification
+    n_point_clouds: int
 
     def to_dict(self) -> dict:
         return {
             "dataset_id": self.dataset_id,
             "seed": self.seed,
-            "mesh_index": self.mesh_index,
+            "point_cloud_index": self.point_cloud_index,
             "transformation": self.transformation.shortname,
-            "label": self.label
+            "label": self.label,
+            "n_point_clouds": self.n_point_clouds
         }
 
     @classmethod
@@ -101,13 +162,14 @@ class TurkevsDatasetInfo:
         return cls (
             dataset_id = data["dataset_id"],
             seed = data["seed"],
-            mesh_index = data["mesh_index"],
+            point_cloud_index = data["point_cloud_index"],
             transformation = TurkevsTransformation.from_shortname(data["transformation"]),
-            label = data["label"]
+            label = data["label"],
+            n_point_clouds = data["n_point_clouds"]
         )
 
     def to_str(self) -> str:
-        return f"turkevs_id={self.dataset_id}_mesh_index={self.mesh_index}_trnsf={self.transformation.shortname}"
+        return f"turkevs_id={self.dataset_id}_point_cloud_index={self.point_cloud_index}_trnsf={self.transformation.shortname}"
 
 
 
@@ -117,9 +179,11 @@ class Dataset:
     data_type: str
     additional_info: Optional[Any] = None
 
+    @property
     def n_points(self) -> int:
         return len(self.points)
 
+    @property
     def ambient_dim(self) -> int:
         return len(self.points[0])
 
@@ -146,20 +210,23 @@ class Dataset:
 @dataclass
 class DatasetSummary:
     data_type: str
+    n_points: int
     additional_info: Optional[Any]
 
     def to_dict(self):
         return {
             "data_type": self.data_type,
+            "n_points": self.n_points,
             "additional_info": self.additional_info.to_dict() if self.additional_info else None
         }
 
     @classmethod
     def from_dict(cls, data):
         data_type = data["data_type"]
+        n_points = data.get("n_points", None)
         additional_info = TurkevsDatasetInfo.from_dict(data["additional_info"]) \
             if data.get("additional_info") and data_type=="turkevs" else None
-        return cls(data_type=data_type, additional_info=additional_info)
+        return cls(data_type=data_type, n_points = n_points, additional_info=additional_info)
 
 
 
@@ -225,19 +292,29 @@ class Parameters:
         return hash(frozenset(self.to_dict().items()))
 
 
+
 @dataclass
 class EllipsoidParameters(Parameters):
     # WARNING: the first ComplexType in the next line is not just a type hint.
     # Without it, the default value won't be set correctly.
     complex_type: ComplexType = ComplexType.ELLIPSOID
     nbhd_size: int = 3
-    axes_ratios: np.ndarray = field(default_factory=lambda: np.array([2,1]))
+    axes_ratios: Optional[np.ndarray] = None
     r_spherisize: float = np.inf
-    save_ellipsoid_list: bool = True
+    save_ellipsoid_list: bool = False
+    use_cache: bool = True
+
+    @property
+    def use_pca_axes(self) -> bool:
+        return self.axes_ratios is None
+
+    def axes_ratios_to_str(self):
+        return "pca" if self.use_pca_axes else str(self.axes_ratios)
 
     def to_filename(self) -> str:
+        axes = self.axes_ratios_to_str()
         return f"nbhd_size={self.nbhd_size}_\
-                 axes_ratios={self.axes_ratios}_\
+                 axes_ratios={axes}_\
                  r_spherisize={self.r_spherisize}_\
                  expansion_dim={self.expansion_dim}_\
                  {self.complex_type}"
@@ -246,10 +323,10 @@ class EllipsoidParameters(Parameters):
         data = super().to_dict()
         data.update({
             "nbhd_size": self.nbhd_size,
-            # "axes_ratios": self.axes_ratios,
-            "axes_ratios": tuple(self.axes_ratios),
+            "axes_ratios": tuple(self.axes_ratios) if self.axes_ratios is not None else None,
             "r_spherisize": self.r_spherisize,
             "save_ellipsoid_list": self.save_ellipsoid_list,
+            "use_cache": self.use_cache
         })
         return data
 
@@ -258,15 +335,14 @@ class EllipsoidParameters(Parameters):
         # Deserialize the parent class fields first
         parent_data = {key: data[key] for key in Parameters.__annotations__ if key in data}
         parameters = Parameters.from_dict(parent_data)
-
         axes_ratios = restore_numpy_array(data.get("axes_ratios", None))  # Default to None if missing
-
         return cls(
             **parameters.__dict__,
             nbhd_size=data["nbhd_size"],
             axes_ratios=axes_ratios,
             r_spherisize=data["r_spherisize"],
-            save_ellipsoid_list=data["save_ellipsoid_list"]
+            save_ellipsoid_list=data["save_ellipsoid_list"],
+            use_cache=data.get("use_cache", None),
         )
 
     def __eq__(self, other):
@@ -321,7 +397,6 @@ class EllipsoidResults(Results):
             **results.__dict__,
             ellipsoid_list = ellipsoid_list
         )
-
 
 
 
@@ -381,13 +456,16 @@ class ExperimentSummary:
         save_to_json(data=self.to_dict(), filename=filename, add_timestamp=False)
 
     def generate_filename(self):
-        filename = self.dataset_summary.data_type
+        dataset_info = self.dataset_summary.data_type
         additional_info = self.dataset_summary.additional_info
         if isinstance(additional_info, TurkevsDatasetInfo):
-            filename = additional_info.to_str()
-        return f"{filename}_{self.parameters.complex_type}-{self.parameters.complex_subtype}"
-
-
+            dataset_info = additional_info.to_str()
+        filename = f"{dataset_info}_{self.parameters.complex_type}-{self.parameters.complex_subtype}"
+        if isinstance(self.parameters, EllipsoidParameters):
+            filename += f"_axes_ratios={self.parameters.axes_ratios_to_str()}"\
+                f"_nbhd_size={self.parameters.nbhd_size}"\
+                f"_r_s={self.parameters.r_spherisize}"
+        return filename
 
 
 
@@ -397,8 +475,6 @@ class Experiment:
         self.parameters = parameters
         self.results: Results = Results()
         self.plot_parameters: PlotParameters = PlotParameters()
-
-
 
     def run(self):
         from ellipsoids.topological_computations import calculate_BALL_Results
@@ -412,23 +488,17 @@ class Experiment:
                     raise TypeError(f"Expected EllipsoidParameters in '{self.run.__name__}', got {type(self.parameters).__name__}")
                 self.results = calculate_ELLIPSOID_Results(self.dataset, self.parameters)
 
-
-
     def print_execution_time(self):
         if self.results is None:
             raise RuntimeError(f"Experiment with parameters {self.parameters} has not been run yet, no execution time to print.")
         print(f"Execution time of {self.parameters.complex_type}-{self.parameters.complex_subtype} is {self.results.execution_time}")
 
-
-
     def _generate_filename(self, add_timestamp=True):
-       filename = f"{self.dataset.data_type}-{self.dataset.n_points()}_{self.parameters.complex_type}-{self.parameters.complex_subtype}"
+       filename = f"{self.dataset.data_type}-{self.dataset.n_points}_{self.parameters.complex_type}-{self.parameters.complex_subtype}"
        if add_timestamp:
            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S%f")
            filename = f"{filename}__{timestamp}"
        return filename
-
-
 
     def to_dict(self):
         experiment_data = {
@@ -438,14 +508,10 @@ class Experiment:
         }
         return experiment_data
 
-
-
     def _generate_filepath(self, filename: Optional[str], folder="data", add_timestamp=True):
         if filename is None:
             filename = f"{self._generate_filename(add_timestamp=add_timestamp)}.json"
         return os.path.join(folder, filename)
-
-
 
     def save_to_json(self, folder="data", filename=None):
         from ellipsoids.data_handling import save_to_json
@@ -454,12 +520,12 @@ class Experiment:
         filepath = self._generate_filepath(filename, folder)
         save_to_json(data=self.to_dict(), filename=filepath, add_timestamp=True)
 
-
-
-    def save_summary(self, filename: Optional[str] = None, folder: Optional[str] = None):
-        from ellipsoids.data_handling import save_to_json
+    def serialize_summary(self):
+        from ellipsoids.data_handling import CustomEncoder
+        import json
         dataset_summary = DatasetSummary(
                 data_type = self.dataset.data_type,
+                n_points = self.dataset.n_points,
                 additional_info = self.dataset.additional_info
             )
         experiment_summary = ExperimentSummary(
@@ -468,32 +534,35 @@ class Experiment:
             barcode = self.results.barcode,
             execution_time = self.results.execution_time
         )
+        return experiment_summary.to_dict()
+        # data = experiment_summary.to_dict()
+        # return json.dumps(data, cls=CustomEncoder, indent=2)
 
-        if not folder and isinstance(dataset_summary.additional_info, TurkevsDatasetInfo):
-            folder = os.path.join("data", "turkevs",
-                                  f"turkevs_id={dataset_summary.additional_info.dataset_id}",
-                                  "experiment_summaries")
-
-        filename = filename or experiment_summary.generate_filename()
-        filepath = self._generate_filepath(filename=filename,
-                                           folder=folder,
-                                           add_timestamp=False)
+    def save_summary(self, folder):
+        from ellipsoids.data_handling import save_to_json
+        dataset_summary = DatasetSummary(
+                data_type = self.dataset.data_type,
+                n_points = self.dataset.n_points,
+                additional_info = self.dataset.additional_info
+            )
+        experiment_summary = ExperimentSummary(
+            dataset_summary = dataset_summary,
+            parameters = self.parameters,
+            barcode = self.results.barcode,
+            execution_time = self.results.execution_time
+            )
+        filename = experiment_summary.generate_filename()
+        filepath = os.path.join(folder,filename)
         save_to_json(data=experiment_summary.to_dict(), filename=filepath, add_timestamp=False)
-
-
 
     def get_results(self):
         return self.results
-
-
 
     @classmethod
     def read_from_json(cls, filename: str):
         from ellipsoids.data_handling import read_from_json
         json_dict = read_from_json(filename)
         return cls.from_dict(json_dict)
-
-
 
     @classmethod
     def from_dict(cls, data: dict) -> "Experiment":
@@ -505,7 +574,6 @@ class Experiment:
         experiment.results = results
         experiment.plot_parameters = PlotParameters()
         return experiment
-
 
 
 
@@ -529,5 +597,12 @@ def convert(value: float, conversion_type: ConversionType):
         return convert_func(value)
     else:
         raise ValueError(f"Invalid conversion type: {conversion_type}")
+
+
+
+
+
+
+
 
 

@@ -13,6 +13,8 @@ import matplotlib.backends.backend_pdf
 import time
 import sys
 import os
+# from sklearn.base import is_classifier, is_regressor
+from scikeras.wrappers import KerasClassifier, KerasRegressor
 
 sys.path.append(os.path.abspath('.'))
 
@@ -31,7 +33,8 @@ def fit(data_train, labels_train, model, num_train_iter = -1):
     if "sklearn" in str(type(model)):
         model = model.fit(data_train, labels_train) 
         history = None        
-    return model, history 
+    # return model, history
+    return model, 2
     
 
 
@@ -39,7 +42,7 @@ def fit(data_train, labels_train, model, num_train_iter = -1):
 # For regression, score = mean squared error, and lower is better.
 def get_score(data_test, labels_test, model):  \
 
-    if "keras" in str(type(model)):    
+    if "keras" in str(type(model)):
         _, score_test = model.evaluate(data_test, labels_test, verbose = 0)    
         
     if "sklearn" in str(type(model)):       
@@ -57,13 +60,13 @@ def get_score(data_test, labels_test, model):  \
 
 
 
-def get_scores_under_trnsfs(data_trnsfs, trnsfs, labels, model):
-    accs = []
-    for trnsf in trnsfs:
-        data = data_trnsfs[trnsf]             
-        acc = get_score(data, labels, model)
-        accs.append(acc)    
-    return accs
+# def get_scores_under_trnsfs(data_trnsfs, trnsfs, labels, model):
+#     accs = []
+#     for trnsf in trnsfs:
+#         data = data_trnsfs[trnsf]
+#         acc = get_score(data, labels, model)
+#         accs.append(acc)
+#     return accs
 
   
     
@@ -85,7 +88,7 @@ def clone(model, problem = "classification"):
     
     return model_cloned
     
-    
+
     
 def grid_search(data, labels, param_grid, model): 
     print("Tuning the hyperparameters with GridSearchCV() ...")
@@ -93,7 +96,7 @@ def grid_search(data, labels, param_grid, model):
     # print("labels.shape = ", labels.shape)    
     # print("Numbers of point clouds with each label value: ", collections.Counter(labels))
     t0 = time.time()  
-    grid_search = GridSearchCV(estimator = model, param_grid = param_grid, cv = 3, n_jobs = -1)
+    grid_search = GridSearchCV(estimator = model, param_grid = param_grid, cv = 3, n_jobs = 1)
     grid_search = grid_search.fit(data, labels)
     t1 = time.time()
     print("Runtime = ", np.around(t1-t0, 2), " seconds.")
@@ -106,12 +109,17 @@ def grid_search(data, labels, param_grid, model):
     print("Best accuracy = ", grid_search.best_score_)   
     
     # Return unfitted model.
-    # Classification problem.
-    if "int" in str(type(labels[0])) or "str" in str(type(labels[0])):  
-        best_model = clone(grid_search.best_estimator_, problem = "classification")
+    # Classification problem# Skip clone for KerasClassifier/KerasRegressor
+    if isinstance(grid_search.best_estimator_, (KerasClassifier, KerasRegressor)):
+        best_model = None  # or grid_search.best_estimator_ if you want.
     else:
-        best_model = clone(grid_search.best_estimator_, problem = "regression")    
+        if "int" in str(type(labels[0])) or "str" in str(type(labels[0])):
+            best_model = clone(grid_search.best_estimator_, problem = "classification")
+        else:
+            best_model = clone(grid_search.best_estimator_, problem = "regression")
     return best_model, grid_search
+
+    # return None, grid_search
 
 
 
