@@ -36,13 +36,6 @@ The main goal of the project is to investigate properties of the ellipsoid compl
 
 This repository contains modules for the generation of ellipsoid complexes, calculation of the corresponding barcodes, visualisation, as well as scripts for running experiments described in the paper. For more details on the code organisation, see the section on <a href="#usage">usage and code organisation</a> below.
 
-> [!CAUTION]
->
-> This project is currently undergoing a major overhaul. The version you're looking at is the most recent one and (hopefully) easier to use. If you're here to explore the code, I recommend using this version.
->
-> This version isn't on the `main` branch yet because the scripts in `ellipsoids/scripts/turkevs`, which are used for running the experiments described in [[3]](#3), are still incomplete.
->
-> Be aware that the old and new versions of the code are not compatible: experiment data generated with the old version won't work directly with this one. It may be possible to write conversion functions to bridge the two, but I don't plan to do that at this time.
 
 
 # Getting started
@@ -134,12 +127,22 @@ In some datasets, especially if very elongated ellipsoids are used, this constru
 The code used to generate this plot is in `ellipsoids/scripts/example_2.py`.
 
 
+
+#### Axes ratios
+
+Axes ratios can either be:
+- fixed (e.g. 2:1). This is achieved by setting `EllipsoidParameters(axes_ratio=[2,1])`.
+- coming from PCA. In this case, set `EllipsoidParameters(axes_ratio=None)`.
+
+
+
+### Classification experiments 
+
+To run the classification experiments described in [[3]](#3), follow the instructions in the dedicated [README](scripts/turkevs/README_turkevs.md).
+
+
 # TODOs
 
-The code has changed a lot since the last version and not everything works yet.
-
-On my TODO list are:
-- rewrite stuff in `ellipsoids/scripts/turkevs` and re-run all experiments;
 - test plotting more thoroughly;
 - clean up unused code;
 - update tests.
