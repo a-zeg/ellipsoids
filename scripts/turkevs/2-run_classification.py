@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath('.'))
 from ellipsoids.data_handling import save_to_json
 from ellipsoids.turkevs.turkevs_utils import find_files_by_keyword
 from ellipsoids.turkevs.turkevs_utils import CModels
-from ellipsoids.turkevs.config import REL_CLASSIFICATION_RESULTS_DIR, REL_DATASETS_DIR, REL_SUMMARIES_DIR, TURKEVS_DATA_DIR
+from ellipsoids.turkevs.config import get_classification_results_path, get_experiment_summaries_path
 from ellipsoids.turkevs.turkevs_utils import read_turkevs_datasets
 from ellipsoids.turkevs.turkevs_utils import read_experiment_summaries_from_jsonl
 from ellipsoids.logging_setup import setup_logging
@@ -22,15 +22,16 @@ from ellipsoids.turkevs.turkevs_utils import check_consistent_barcode_counts
 from ellipsoids.turkevs.turkevs_utils import evaluate_model
 from ellipsoids.turkevs.turkevs_utils import PreprocessingCache
 from ellipsoids.turkevs.turkevs_utils import pipeline_registry
+from ellipsoids.turkevs.config import get_datasets_path
 
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def main(folder):
+def main():
 
-    # folder = "data/turkevs/turkevs_npc=100_np=100_s=0"
+    setup_path = "data/turkevs/turkevs_npc=100_np=20_s=0"
     pipelines = [
         CModels.PHE,
         CModels.PH,
@@ -42,10 +43,10 @@ def main(folder):
     ]
 
     args = parse_args()
-    folder = args.folder or folder
-    logger.info(f"Calculating ellipsoids data for the folder {folder}...")
+    setup_path = args.folder or setup_path
+    logger.info(f"Calculating ellipsoids data for the folder {setup_path}...")
 
-    datasets_path = find_files_by_keyword(os.path.join(folder, REL_DATASETS_DIR), "datasets")[0]
+    datasets_path = get_datasets_path(setup_path)
     datasets = read_turkevs_datasets(datasets_path)
     datasets_per_transformation_sorted = get_datasets_per_transformation_sorted(datasets)
     labels = get_labels_sorted(datasets)
@@ -55,20 +56,12 @@ def main(folder):
 
     evaluation_results = []
     if CModels.PHE in special_pipelines:
-        summaries_folder = os.path.join(folder, REL_SUMMARIES_DIR)
-        matching_paths = [os.path.join(summaries_folder,f) for f in os.listdir(summaries_folder)
-                          if (os.path.isfile(os.path.join(summaries_folder, f))
-                              and "summaries" in f
-                              and f.endswith(".jsonl.gz")
-                              )
-                          ]
-        if len(matching_paths) > 1: raise IOError(f"More than one matching summaries file found in {summaries_folder}.")
-        summaries_path = matching_paths[0]
+        summaries_path = get_experiment_summaries_path(setup_path)
         experiment_summaries = read_experiment_summaries_from_jsonl(summaries_path)
         barcodes_dim_1_per_parameters = get_barcodes_dim_1_per_parameters_per_transformation_sorted(experiment_summaries)
         summaries_consistent = check_consistent_barcode_counts(barcodes_dim_1_per_parameters)
         if not summaries_consistent:
-            raise ValueError(f"Data incomplete: inconsistent barcode counts in experiment summaries in {folder}.")
+            raise ValueError(f"Data incomplete: inconsistent barcode counts in experiment summaries in {setup_path}.")
 
         model_key = CModels.PHE
         current_pipeline_setup = pipeline_registry[model_key]
@@ -107,28 +100,15 @@ def main(folder):
             model_key.name)
         evaluation_results.append(accuracy)
 
-    classification_results_folder = os.path.join(folder, REL_CLASSIFICATION_RESULTS_DIR)
+    classification_results_path = get_classification_results_path(setup_path)
     save_to_json([ev_res.to_dict() for ev_res in evaluation_results],
-                 os.path.join(classification_results_folder, f"accuracies_{os.path.basename(folder)}.json"),
+                 classification_results_path,
                  add_timestamp=True)
 
 
 
 if __name__ == '__main__':
 
-
-    # folders = [os.path.join(TURKEVS_DATA_DIR, folder) for folder in os.listdir(TURKEVS_DATA_DIR) if os.path.isdir(os.path.join(TURKEVS_DATA_DIR, folder))]
-    folder = "data/turkevs/turkevs_npc=100_np=300_s=0"
-    folders = [folder]
     n_runs = 10
-
-    # main(folder)
-
-    for folder in folders:
-        for _ in np.arange(n_runs):
-            main(folder)
-            # try:
-            #     main(folder)
-            # except Exception as e:
-            #     print(f"Error processing folder '{folder}': {e}")
-            #     break
+    for _ in np.arange(n_runs):
+        main()

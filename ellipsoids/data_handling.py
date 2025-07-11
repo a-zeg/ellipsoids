@@ -21,12 +21,6 @@ from ellipsoids.common import Ellipsoid, TurkevsDatasetInfo, ExperimentSummary
 logger = logging.getLogger(__name__)
 
 
-# def axes_lengths_to_int_ratio(axes_lengths: np.ndarray):
-#     ''' Converts axes lengths to an integer "ratio", e.g. [1,0.5,0.2] becomes 1/0.2 = 5'''
-
-#     q = axes_lengths / axes_lengths[-1]
-#     return q.astype(int)
-
 
 def sample_from_circle(n_pts: int = 100, variation: float = 0.1, outlier: bool = False):
     if outlier is True: 
@@ -321,15 +315,15 @@ def remove_dim_from_barcode(barcode):
 
 
 
-T = TypeVar("T")
+# T = TypeVar("T")
 
-def check_type(variable: Any, expected_type: Type[T]) -> T:
-    if isinstance(variable, expected_type):
-        return cast(T, variable) # signaling to the type checker (it does nothing at runtime).
-    raise TypeError(
-        f"Expected the variable {variable.__name__} to be of type {expected_type.__name__}, "
-        f"got {type(variable).__name__} instead."
-    )
+# def check_type(variable: Any, expected_type: Type[T]) -> T:
+#     if isinstance(variable, expected_type):
+#         return cast(T, variable) # signaling to the type checker (it does nothing at runtime).
+#     raise TypeError(
+#         f"Expected the variable {variable.__name__} to be of type {expected_type.__name__}, "
+#         f"got {type(variable).__name__} instead."
+#     )
 
 
 
@@ -361,48 +355,6 @@ def build_signature_index_from_jsonl(summaries_jsonl_path: str) -> dict:
 
 
 
-    summary_files = get_paths_of_files_in_a_folder(folder=summaries_folder, extension="json")
-    for filepath in summary_files:
-        # try:
-            with open(filepath, 'r') as f:
-                data = json.load(f)
-            summary = ExperimentSummary.from_dict(data)
-            sig = generate_signature_from_dataset_summary_parameters(
-                summary.dataset_summary,
-                summary.parameters
-            )
-            summary_index[sig] = {
-                "parameters": summary.parameters.to_dict(),
-                "dataset_summary": summary.dataset_summary.to_dict()
-            }
-        # except Exception as e:
-        #     logger.warning(f"Skipping file {filepath}: {e}")
-
-    return summary_index
-
-
-def build_signature_index_from_folder(summaries_folder: str) -> dict:
-    summary_index = {}
-    summary_files = get_paths_of_files_in_a_folder(folder=summaries_folder, extension="json")
-    for filepath in summary_files:
-        # try:
-            with open(filepath, 'r') as f:
-                data = json.load(f)
-            summary = ExperimentSummary.from_dict(data)
-            sig = generate_signature_from_dataset_summary_parameters(
-                summary.dataset_summary,
-                summary.parameters
-            )
-            summary_index[sig] = {
-                "parameters": summary.parameters.to_dict(),
-                "dataset_summary": summary.dataset_summary.to_dict()
-            }
-        # except Exception as e:
-        #     logger.warning(f"Skipping file {filepath}: {e}")
-
-    return summary_index
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Calculate ellipsoid barcodes on a dataset folder.")
     parser.add_argument(
@@ -425,8 +377,3 @@ def parse_args():
     )
     return parser.parse_args()
 
-
-
-def should_skip(signature_index, dataset_summary, parameters) -> bool:
-    signature = generate_signature_from_dataset_summary_parameters(dataset_summary, parameters)
-    return signature in signature_index

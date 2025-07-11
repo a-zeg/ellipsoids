@@ -5,7 +5,7 @@ import sys
 import re
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, Any, cast
+from typing import Optional, Any, cast, Iterator
 from collections import defaultdict
 import logging
 import hashlib
@@ -29,7 +29,7 @@ from ellipsoids.common import Dataset
 from ellipsoids.data_handling import CustomEncoder
 from ellipsoids.data_handling import read_from_json
 from ellipsoids.data_handling import get_paths_of_files_in_a_folder
-from ellipsoids.data_handling import check_type
+# from ellipsoids.data_handling import check_type
 from ellipsoids.data_handling import filter_barcode
 from ellipsoids.data_handling import filter_barcode
 from ellipsoids.data_handling import get_paths_of_files_in_a_folder
@@ -130,72 +130,22 @@ def generate_datasets_hash(datasets: list[Dataset], hash_length: int = 6):
 
 
 
-# def format_dataset_number_id(id: int):
-#     return str(id).zfill(4)
-
-
-# def check_id_exists(parent_folder: str, folder: str):
-#     paths = os.listdir(parent_folder)
-#     if folder in paths:
-#         raise FileExistsError(f"A folder {folder} already exists in folder {parent_folder}.")
-
-
-
-# def generate_dataset_number_id(folder):
-#     '''
-#     The datasets used in the Turkevs holes tests are generated using the code from the paper and saved in a json file.
-#     To keep track of which datasets correspond to which data / graphs, 'id' is introduced.
-
-#     This function checks the ids of all the dataset files in the given folder and returns the next available one.
-#     '''
-#     if not os.path.exists(folder):
-#         return format_dataset_number_id(0)
-#     paths = os.listdir(folder)
-#     existing_ids = set()
-
-#     # add all ids to existing_ids
-#     for path in paths:
-#         match = re.search(r'id=(\d+)', path)
-#         if match:
-#             try:
-#                 current_id = int(match.group(1))
-#                 existing_ids.add(current_id)
-#             except ValueError:
-#                 continue
-
-#     # find a new id
-#     new_id = 0
-#     while new_id in existing_ids:
-#         new_id += 1
-
-#     return format_dataset_number_id(new_id)
-
-
-
-def get_turkevs_dataset_id(path: str):
-    match = re.search(r'id=([a-f0-9]+)', path)
-    if match:
-        return str(match.group(1))
-    raise ValueError(f"Dataset ID could not be found in the path: {path}")
-
-
-
 def read_turkevs_datasets(datasets_path):
     logger.info(f"Reading in Turkevs datasets from {datasets_path}...")
     datasets_dicts = read_from_json(datasets_path)
     datasets = [Dataset.from_dict(d) for d in datasets_dicts]
-    id = get_turkevs_dataset_id(datasets_path)
-    datasets = ensure_turkevs_datasets_consistency(datasets, id)
+    datasets = ensure_turkevs_datasets_consistency(datasets)
     logger.info("Datasets read.")
     return datasets
 
 
 
-def ensure_turkevs_datasets_consistency(datasets: list[Dataset], dataset_id: Optional[str] = None):
+def ensure_turkevs_datasets_consistency(datasets: list[Dataset]):
+    # dataset_id = check_type(datasets[0].additional_info, TurkevsDatasetInfo).dataset_id
+    dataset_id = cast(TurkevsDatasetInfo, datasets[0].additional_info).dataset_id
     for dataset in datasets:
-        dataset = check_type(dataset, Dataset)
-        dataset.additional_info = check_type(dataset.additional_info, TurkevsDatasetInfo)
-        if dataset_id is not None and dataset.additional_info.dataset_id != dataset_id:
+        dataset_info = cast(TurkevsDatasetInfo, dataset.additional_info)
+        if dataset_id is not None and dataset_info.dataset_id != dataset_id:
             raise ValueError(f"Error: there is a mismatch between the dataset ID {dataset_id} \
                 and the provided ID {id}.")
     return datasets
@@ -624,85 +574,6 @@ def make_parameter_filter(**criteria):
 
 
 
-# def run_classification_experiments(experiment_summaries: list[ExperimentSummary],
-#                                    datasets: list[Dataset],
-#                                    pipelines: list = [m for m in CModels]):
-#     datasets_per_transformation_sorted = get_datasets_per_transformation_sorted(datasets)
-#     labels = get_labels_sorted(datasets)
-#     train_indices, test_indices = get_train_and_test_indices(datasets_per_transformation_sorted)
-
-#     evaluation_results = []
-
-#     if CModels.PHE in pipelines:
-#         barcodes_dim_1_per_parameters = get_barcodes_dim_1_per_parameters_per_transformation_sorted(experiment_summaries)
-#         summaries_consistent = check_consistent_barcode_counts(barcodes_dim_1_per_parameters)
-#         if not summaries_consistent:
-#             raise ValueError("Inconsistent barcode counts in experiment summaries.")
-
-#         for parameters, pde_1_per_transformation in barcodes_dim_1_per_parameters.items():
-#             pde_accuracy = evaluate_model(pde_1_per_transformation, labels, train_indices, test_indices, ph_ml, CModels.PHE.name)
-#             pde_accuracy.parameters = parameters
-#             evaluation_results.append(pde_accuracy)
-
-#         # rips_from_ellipsoids = next(
-#         #     (
-#         #         barcodes_per_transformations
-#         #         for params, barcodes_per_transformations in barcodes_dim_1_per_parameters.items()
-#         #         if params.complex_type == ComplexType.BALL and params.complex_subtype == ComplexSubtype.RIPS
-#         #     ),
-#         #     None
-#         #     )
-
-#     trnsfs = [t.shortname for t in TurkevsTransformation]
-
-#     if any(m in pipelines for m in [CModels.PH, CModels.PH_simple]):
-#         data_pd1_per_transformation = {
-#             t: ph.calculate_pds_point_clouds(datasets_per_transformation_sorted[t],
-#                                             fil_complex="alpha",
-#                                             fil_fun="dtm",
-#                                             m=0.03,
-#                                             p=1)[1]
-#             for t in trnsfs
-#         }
-
-#         if CModels.PH in pipelines:
-#             pd_accuracy = evaluate_model(data_pd1_per_transformation, labels, train_indices, test_indices, ph_ml, CModels.PH.name)
-#             evaluation_results.append(pd_accuracy)
-
-
-
-#         if CModels.PH_simple in pipelines:
-#             data_ph_simple_per_transformation = {
-#                 t: ph.sorted_lifespans_pds(data_pd1_per_transformation[t], size=10) for t in trnsfs }
-#             ph_simple_accuracy = evaluate_model(data_ph_simple_per_transformation, labels, train_indices, test_indices, ml, CModels.PH_simple.name)
-#             evaluation_results.append(ph_simple_accuracy)
-
-#     if any(m in pipelines for m in [CModels.ML, CModels.NN_shallow, CModels.NN_deep]):
-#         data_dis_mat_flat_trnsfs = data_construction.calculate_distance_matrices_flat_under_trnsfs(
-#             point_clouds_trnsfs=datasets_per_transformation_sorted,
-#             trnsfs=trnsfs)
-#         labels_con, _ = data_construction.encode_labels(labels)
-
-#         if CModels.ML in pipelines:
-#             ml_accuracy = evaluate_model(data_dis_mat_flat_trnsfs, labels_con, train_indices, test_indices, ml, CModels.ML.name)
-#             evaluation_results.append(ml_accuracy)
-#         if CModels.NN_shallow in pipelines:
-#             nn_shallow_accuracy = evaluate_model(data_dis_mat_flat_trnsfs, labels_con, train_indices, test_indices, nn_shallow, CModels.NN_shallow.name)
-#             evaluation_results.append(nn_shallow_accuracy)
-#         if CModels.NN_deep in pipelines:
-#             nn_deep_accuracy = evaluate_model(data_dis_mat_flat_trnsfs, labels_con, train_indices, test_indices, nn_deep, CModels.NN_deep.name)
-#             evaluation_results.append(nn_deep_accuracy)
-
-#     if CModels.PointNet in pipelines:
-#         data_pc_3d_trnsfs = data_construction.calculate_3d_point_clouds_under_trnsfs(point_clouds_trnsfs = datasets_per_transformation_sorted, trnsfs = trnsfs)
-#         labels_con, _ = data_construction.encode_labels(labels)
-#         point_net_accuracy = evaluate_model(data_pc_3d_trnsfs, labels_con, train_indices, test_indices, point_net, CModels.PointNet.name)
-#         evaluation_results.append(point_net_accuracy)
-
-#     return evaluation_results
-
-
-
 @dataclass
 class AggregatedResults():
     mean_accuracy_per_trnsf: dict
@@ -754,6 +625,7 @@ def calculate_aggregated_classification_results(results_folder: str):
     return sort_aggregated_results(aggregated_results)
 
 
+
 def sort_aggregated_results(aggregated_results, pipeline_order=[CModels.PHE, CModels.PH, CModels.PH_simple, CModels.NN_shallow, CModels.NN_deep, CModels.PointNet]):
     pipeline_order_names = [p.name for p in pipeline_order]
     def sort_key(res):
@@ -780,7 +652,9 @@ def add_aggregate_results_labels(aggregated_results):
 
 
 
-def plot_aggregated_results(aggregated_results_per_datatype, output_folder, print_parameters=True, base_filename="aggregated_results"):
+def plot_aggregated_results(aggregated_results_per_datatype,
+                            output_path,
+                            print_parameters=True):
     transformations = [t.fullname for t in TurkevsTransformation]
     plot_data = {}
     err_data = {}
@@ -798,23 +672,20 @@ def plot_aggregated_results(aggregated_results_per_datatype, output_folder, prin
 
     title = f"Mean classification accuracy per transformation (≥{min_n_runs} runs)\n\n"
     plots.plot_bar_chart(transformations, average_accs, results_labels, err_data, title)
-    plt.savefig(os.path.join(output_folder, base_filename), bbox_inches = "tight")
+    plt.savefig(output_path, bbox_inches = "tight")
 
-    # plot_legend_file = "accs_trnsfs_averages_legend.txt"
-    plot_legend_file = f"{base_filename}_legend.txt"
+    plot_legend_path = f"{output_path}_legend.txt"
     plot_parameters = f"{title} legend:\n\n"
     for plot_label, parameters in params_for_label.items():
         if parameters is not None:
             plot_parameters += f"{plot_label}:\n{parameters.to_dict()}\n\n"
 
-    with open (os.path.join(output_folder, plot_legend_file), "w") as f:
+    with open (plot_legend_path, "w") as f:
         f.write(plot_parameters)
 
     if print_parameters:
         print(plot_parameters)
 
-
-from typing import Iterator
 
 
 def iter_experiment_summaries_from_compressed_jsonl(filepath: str) -> Iterator[ExperimentSummary]:
@@ -838,30 +709,16 @@ def read_experiment_summaries_from_jsonl(filepath: str) -> list[ExperimentSummar
 
 
 
-    # if not os.path.exists(filepath):
-    #     if os.path.exists(filepath + ".gz"):
-    #         filepath += ".gz"
-    #     else:
-    #         raise FileNotFoundError(f"No such file: '{filepath}' or '{filepath}.gz'")
-    # experiment_summaries = []
-    # with gzip.open(filepath, "rt", encoding="utf-8") as f:
-    #     for line in f:
-    #         try:
-    #             data = json.loads(line)
-    #             experiment_summaries.append(ExperimentSummary.from_dict(data))
-    #         except json.JSONDecodeError as e:
-    #             logger.warning(f"Skipping invalid JSON line: {e}")
-    # return experiment_summaries
-
-
-
 def flush_buffer(buffer: list, output_path: str, compress: bool = True):
     if not buffer:
         return
 
+    print(output_path)
+
     open_func = gzip.open if compress else open
     mode = "at" if compress else "a"
-    output_path = output_path + ".gz" if compress else output_path
+    output_path = output_path + ".json" if os.path.splitext(output_path)[1] == "" else output_path
+    output_path = output_path + ".gz" if compress and os.path.splitext(output_path)[1] != ".gz" else output_path
 
     with open_func(output_path, mode, encoding="utf-8") as f:
         for entry in buffer:
