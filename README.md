@@ -98,7 +98,7 @@ The paper in its current form would not be possible without the following papers
 # References
 
 <a id="1">[1]</a> 
-S. Kališnik, B. Rieck and A. Žegarac.
+N.Canova, S. Kališnik, A. Moser B. Rieck and A. Žegarac.
 "Persistent Homology via Ellipsoids".
 
 <a id="2">[2]</a>
