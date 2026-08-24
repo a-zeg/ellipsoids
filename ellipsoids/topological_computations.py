@@ -230,7 +230,7 @@ def find_intersection_radius(
     max_axes_ratio = max(get_max_axes_ratio(ellipsoid_1), get_max_axes_ratio(ellipsoid_2))
     lower_bound_r = (dist / 2) - epsilon              # maximum filtration at which ellipsoids can not intersect
     upper_bound_r = dist/2 * max_axes_ratio + epsilon # minimum filtration at which ellipsoids can intersect
-    r = (upper_bound_r - lower_bound_r)/2
+    r = (upper_bound_r + lower_bound_r)/2
 
     intersection_fn = (
         ellipsoid_intersection_cached if use_cache
