@@ -156,6 +156,7 @@ If you spot any blunders or if you're trying to use the code and you can't find 
 The last co-author of the paper [[1]](#1) would like to thank:
 - Marco Gähler for running the Code Review Days at ETH Zurich, for taking the time to read through multiple versions of the code, and for his tips on testing and improving code readability.
 - Jan Schüssler for his help with parallelisation and Python paths.
+- [Alan Greene](https://github.com/agreene01) for a helpful bug report.
 
 The paper in its current form would not be possible without the following papers, libraries, and datasets.
 
