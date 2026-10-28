@@ -588,54 +588,111 @@ def sample_point_cloud(n = NUM_POINTS, shape = " "):
 
 
 
-def build_dataset_holes(N = NUM_POINT_CLOUDS, n = NUM_POINTS):
-    shapes = ["parabola", "sphere", "fountain", "two spheres",             # 0 holes
-              "circle", "pentagon", "annulus", "3d curve",                 # 1 hole
-              "two circles", "lemniscate", "concentric circles", "torus",  # 2 holes
-              "rose curve 4", "face", "double torus", "necklace",          # 4 holes
-              "rose curve 9", "olympics", "nine squares", "handlebody"]    # 9 holes
-    num_cycles = [0, 0, 0, 0,
-                  1, 1, 1, 1,
-                  2, 2, 2, 2,
-                  4, 4, 4, 4,
-                  9, 9, 9, 9]
-    
-    num_shapes = len(shapes)
-    num_point_clouds_shape = int(N / num_shapes)
-    if num_point_clouds_shape == 0:
-        print("There are 20 shapes in the holes dataset, so that at least 20 point clouds must be created!")
+TURKEVS_CORE_SHAPES = [
+    ("parabola", 0),
+    ("sphere", 0),
+    ("fountain", 0),
+    ("two spheres", 0),
 
-    # point_clouds is a list, rather than an array, since some point clouds are 2D, and some are 3D.
+    ("circle", 1),
+    ("pentagon", 1),
+    ("annulus", 1),
+    ("3d curve", 1),
+
+    ("two circles", 2),
+    ("lemniscate", 2),
+    ("concentric circles", 2),
+    ("torus", 2),
+
+    ("rose curve 4", 4),
+    ("face", 4),
+    ("double torus", 4),
+    ("necklace", 4),
+
+    ("rose curve 9", 9),
+    ("olympics", 9),
+    ("nine squares", 9),
+    ("handlebody", 9),
+]
+
+
+def build_dataset_holes(
+        n_shape_variations: int,
+        n: int = NUM_POINTS,
+        ):
+    # shapes = ["parabola", "sphere", "fountain", "two spheres",             # 0 holes
+    #           "circle", "pentagon", "annulus", "3d curve",                 # 1 hole
+    #           "two circles", "lemniscate", "concentric circles", "torus",  # 2 holes
+    #           "rose curve 4", "face", "double torus", "necklace",          # 4 holes
+    #           "rose curve 9", "olympics", "nine squares", "handlebody"]    # 9 holes
+    # num_cycles = [0, 0, 0, 0,
+    #               1, 1, 1, 1,
+    #               2, 2, 2, 2,
+    #               4, 4, 4, 4,
+    #               9, 9, 9, 9]
+    # shapes = [shape for shape, _ in TURKEVS_CORE_SHAPES]
+    # num_cycles = [label for _, label in TURKEVS_CORE_SHAPES]
+    
+    # num_shapes = len(shapes)
+    # num_point_clouds_shape = int(N / num_shapes)
+    # if num_point_clouds_shape == 0:
+    #     print("There are 20 shapes in the holes dataset, so that at least 20 point clouds must be created!")
+
+    # # point_clouds is a list, rather than an array, since some point clouds are 2D, and some are 3D.
+    # point_clouds = []
+    # labels = []
+    # labels_shape = []
+    # for i, shape in enumerate(shapes):        
+    #     for j in range(num_point_clouds_shape):
+    #         point_cloud = sample_point_cloud(n, shape)
+    #         point_cloud = normalize(point_cloud)
+    #         label = num_cycles[i]
+    #         point_clouds = point_clouds + [point_cloud]
+    #         labels = labels + [label] 
+    #         labels_shape = labels_shape + [shape]
+        
+    #     # An example of a point cloud of a given shape (the last generated point cloud).
+    #     # plots.plot_point_cloud(point_cloud, title = shape + ", label = " + str(label) + ", num_points = " + str(point_cloud.shape[0]))
+    
+    # labels = np.asarray(labels)
+    # labels_shape = np.asarray(labels_shape)
+    
+    # print("Dataset of point clouds for the detection of the number of holes:")
+    # print("num_shapes = ", num_shapes)
+    # print("type(point_clouds) = ", type(point_clouds))
+    # print("len(point_clouds) = ", len(point_clouds))
+    # print("point_clouds[0].shape = ", point_clouds[0].shape)
+    # print()
+    # print("type(labels) = ", type(labels))
+    # print("len(labels) = ", len(labels))
+    # print("Numbers of point clouds with each label value = ", collections.Counter(labels))
+    
+    # return point_clouds, labels, labels_shape
     point_clouds = []
     labels = []
-    labels_shape = []
-    for i, shape in enumerate(shapes):        
-        for j in range(num_point_clouds_shape):
+    shape_names = []
+    shape_variation_indices = []
+
+    for shape, label in TURKEVS_CORE_SHAPES:
+        for variation_index in range(n_shape_variations):
             point_cloud = sample_point_cloud(n, shape)
             point_cloud = normalize(point_cloud)
-            label = num_cycles[i]
-            point_clouds = point_clouds + [point_cloud]
-            labels = labels + [label] 
-            labels_shape = labels_shape + [shape]
-        
-        # An example of a point cloud of a given shape (the last generated point cloud).
-        # plots.plot_point_cloud(point_cloud, title = shape + ", label = " + str(label) + ", num_points = " + str(point_cloud.shape[0]))
-    
-    labels = np.asarray(labels)
-    labels_shape = np.asarray(labels_shape)
-    
-    print("Dataset of point clouds for the detection of the number of holes:")
-    print("num_shapes = ", num_shapes)
-    print("type(point_clouds) = ", type(point_clouds))
-    print("len(point_clouds) = ", len(point_clouds))
-    print("point_clouds[0].shape = ", point_clouds[0].shape)
-    print()
-    print("type(labels) = ", type(labels))
-    print("len(labels) = ", len(labels))
-    print("Numbers of point clouds with each label value = ", collections.Counter(labels))
-    
-    return point_clouds, labels, labels_shape
 
+            point_clouds.append(point_cloud)
+            labels.append(label)
+            shape_names.append(shape)
+            shape_variation_indices.append(variation_index)
+
+    labels = np.asarray(labels)
+    shape_names = np.asarray(shape_names)
+    shape_variation_indices = np.asarray(shape_variation_indices)
+
+    return (
+        point_clouds,
+        labels,
+        shape_names,
+        shape_variation_indices,
+    )
 
 
 ############################################## CURVATURE #################################################################

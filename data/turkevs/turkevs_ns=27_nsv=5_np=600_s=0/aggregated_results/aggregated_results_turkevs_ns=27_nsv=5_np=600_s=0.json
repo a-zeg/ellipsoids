@@ -1,0 +1,155 @@
+[
+  {
+    "parameters": {
+      "expansion_dim": 2,
+      "collapse_edges": true,
+      "complex_type": "ELLIPSOID",
+      "complex_subtype": "RIPS",
+      "save_simplex_tree": false,
+      "nbhd_size": 20,
+      "axes_ratios": [
+        2.5,
+        1.0
+      ],
+      "axes": null,
+      "r_spherisize": Infinity,
+      "save_ellipsoid_list": false,
+      "use_cache": true
+    },
+    "mean_accuracy_per_trnsf": {
+      "std": 0.910493827160494,
+      "trns": 0.910493827160494,
+      "rot": 0.910493827160494,
+      "stretch": 0.861111111111111,
+      "shear": 0.8919753086419754,
+      "gauss": 0.9058641975308642,
+      "out": 0.5864197530864198
+    },
+    "sd_accuracy_per_trnsf": {
+      "std": 0.042655169632979176,
+      "trns": 0.042655169632979176,
+      "rot": 0.042655169632979176,
+      "stretch": 0.041752312526137904,
+      "shear": 0.03842561604317508,
+      "gauss": 0.038518469056631734,
+      "out": 0.09542978292432289
+    },
+    "n_runs": 24,
+    "pipeline_name": "PHE",
+    "results_label": "PHE [1]"
+  },
+  {
+    "parameters": {
+      "expansion_dim": 2,
+      "collapse_edges": true,
+      "complex_type": "ELLIPSOID",
+      "complex_subtype": "RIPS",
+      "save_simplex_tree": false,
+      "nbhd_size": 20,
+      "axes_ratios": null,
+      "axes": null,
+      "r_spherisize": Infinity,
+      "save_ellipsoid_list": false,
+      "use_cache": true
+    },
+    "mean_accuracy_per_trnsf": {
+      "std": 0.8688271604938272,
+      "trns": 0.8688271604938272,
+      "rot": 0.8688271604938272,
+      "stretch": 0.8688271604938271,
+      "shear": 0.867283950617284,
+      "gauss": 0.8657407407407408,
+      "out": 0.6435185185185186
+    },
+    "sd_accuracy_per_trnsf": {
+      "std": 0.021327584816489567,
+      "trns": 0.021327584816489567,
+      "rot": 0.021327584816489567,
+      "stretch": 0.026143633250150324,
+      "shear": 0.028118622157852772,
+      "gauss": 0.025776686864953793,
+      "out": 0.06486990604007314
+    },
+    "n_runs": 24,
+    "pipeline_name": "PHE",
+    "results_label": "PHE [2]"
+  },
+  {
+    "parameters": null,
+    "mean_accuracy_per_trnsf": {
+      "std": 0.7391975308641975,
+      "trns": 0.7391975308641975,
+      "rot": 0.7391975308641975,
+      "stretch": 0.70679012345679,
+      "shear": 0.7453703703703703,
+      "gauss": 0.7222222222222223,
+      "out": 0.6790123456790124
+    },
+    "sd_accuracy_per_trnsf": {
+      "std": 0.10663792408244793,
+      "trns": 0.10663792408244793,
+      "rot": 0.10663792408244793,
+      "stretch": 0.10024927017846738,
+      "shear": 0.11580245268367041,
+      "gauss": 0.09622504486493763,
+      "out": 0.09895814532025553
+    },
+    "n_runs": 24,
+    "pipeline_name": "PH",
+    "results_label": "PH"
+  },
+  {
+    "parameters": null,
+    "mean_accuracy_per_trnsf": {
+      "std": 0.736111111111111,
+      "trns": 0.736111111111111,
+      "rot": 0.736111111111111,
+      "stretch": 0.7391975308641975,
+      "shear": 0.7268518518518517,
+      "gauss": 0.7299382716049382,
+      "out": 0.6327160493827161
+    },
+    "sd_accuracy_per_trnsf": {
+      "std": 0.054843690259002646,
+      "trns": 0.054843690259002646,
+      "rot": 0.054843690259002646,
+      "stretch": 0.059026516971929864,
+      "shear": 0.049934227430134065,
+      "gauss": 0.04068341458785207,
+      "out": 0.055469755418553784
+    },
+    "n_runs": 24,
+    "pipeline_name": "PH_simple",
+    "results_label": "PH_simple"
+  },
+  {
+    "parameters": {
+      "expansion_dim": 2,
+      "collapse_edges": true,
+      "complex_type": "BALL",
+      "complex_subtype": "RIPS",
+      "save_simplex_tree": false
+    },
+    "mean_accuracy_per_trnsf": {
+      "std": 0.7407407407407408,
+      "trns": 0.7407407407407408,
+      "rot": 0.7407407407407408,
+      "stretch": 0.7299382716049383,
+      "shear": 0.7314814814814815,
+      "gauss": 0.736111111111111,
+      "out": 0.4953703703703703
+    },
+    "sd_accuracy_per_trnsf": {
+      "std": 0.015120307054217146,
+      "trns": 0.015120307054217146,
+      "rot": 0.015120307054217146,
+      "stretch": 0.02502665854973279,
+      "shear": 0.01927468518024195,
+      "gauss": 0.01625872492724187,
+      "out": 0.05432011082345075
+    },
+    "n_runs": 24,
+    "pipeline_name": "PHR",
+    "results_label": "PHR"
+  }
+]

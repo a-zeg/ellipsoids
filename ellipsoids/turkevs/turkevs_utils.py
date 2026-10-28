@@ -16,6 +16,8 @@ sys.path.append(os.path.abspath('.'))
 
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.model_selection import train_test_split
+
 from ellipsoids.common import TurkevsTransformation
 from ellipsoids.common import Dataset
 from ellipsoids.common import Parameters
@@ -26,7 +28,7 @@ from ellipsoids.common import Parameters
 from ellipsoids.common import TurkevsDatasetInfo
 from ellipsoids.common import ExperimentSummary
 from ellipsoids.common import Dataset
-from ellipsoids.data_handling import CustomEncoder
+from ellipsoids.data_handling import CustomEncoder, sample_multiscale_loops
 from ellipsoids.data_handling import read_from_json
 from ellipsoids.data_handling import get_paths_of_files_in_a_folder
 # from ellipsoids.data_handling import check_type
@@ -48,8 +50,18 @@ import ellipsoids.turkevs.nn_shallow as nn_shallow
 import ellipsoids.turkevs.nn_deep as nn_deep
 import ellipsoids.turkevs.point_net as point_net
 import ellipsoids.turkevs.plots as plots
+# from ellipsoids.turkevs.additional_datasets import
+from ellipsoids.data_handling import (
+    sample_from_figure_eight,
+    sample_spiral,
+    sample_3d_bottleneck,
+    sample_braided_theta,
+    sample_folded_ladder,
+    sample_multiscale_loops,
+)
+from ellipsoids.turkevs.data_construction import TURKEVS_CORE_SHAPES
 
-
+from functools import partial
 
 logger = logging.getLogger(__name__)
 
@@ -60,42 +72,394 @@ def generate_turkevs_results_folder_name(n_point_clouds: int, n_points: int, see
 
 
 
-def generate_turkevs_datasets(n_point_clouds: int,
-                              n_points: int,
-                              seed: int,
-                              dataset_id=""):
+def generate_variations_of_point_cloud_():
+    pass
+
+
+# ADDITIONAL_SHAPES = [
+#     (sample_spiral, 0),
+#     (sample_3d_bottleneck, 1),
+#     (sample_from_figure_eight, 1),
+
+#     (partial(sample_braided_theta, holes=2), 2),
+#     (partial(sample_braided_theta, holes=4), 4),
+#     (partial(sample_braided_theta, holes=9), 9),
+
+#     (partial(sample_folded_ladder, holes=2), 2),
+#     (partial(sample_folded_ladder, holes=4), 4),
+#     (partial(sample_folded_ladder, holes=9), 9),
+
+#     (partial(sample_multiscale_loops, holes=2), 2),
+#     (partial(sample_multiscale_loops, holes=4), 4),
+#     (partial(sample_multiscale_loops, holes=9), 9),
+# ]
+ADDITIONAL_SHAPES = [
+    ("spiral", sample_spiral, 0),
+    ("3d_bottleneck", sample_3d_bottleneck, 1),
+    ("figure_eight", sample_from_figure_eight, 1),
+
+    ("braided_theta_2", partial(sample_braided_theta, holes=2), 2),
+    ("braided_theta_4", partial(sample_braided_theta, holes=4), 4),
+    ("braided_theta_9", partial(sample_braided_theta, holes=9), 9),
+
+    ("folded_ladder_2", partial(sample_folded_ladder, holes=2), 2),
+    ("folded_ladder_4", partial(sample_folded_ladder, holes=4), 4),
+    ("folded_ladder_9", partial(sample_folded_ladder, holes=9), 9),
+
+    ("multiscale_loops_2", partial(sample_multiscale_loops, holes=2), 2),
+    ("multiscale_loops_4", partial(sample_multiscale_loops, holes=4), 4),
+    ("multiscale_loops_9", partial(sample_multiscale_loops, holes=9), 9),
+]
+
+
+
+SHAPE_GROUPS = {
+    "turkevs": TURKEVS_CORE_SHAPES,
+    "additional": ADDITIONAL_SHAPES,
+}
+
+
+def get_n_shapes(shape_groups):
+    unknown_groups = set(shape_groups) - set(SHAPE_GROUPS)
+
+    if unknown_groups:
+        raise ValueError(
+            f"Unknown shape groups: {sorted(unknown_groups)}"
+        )
+
+    if len(shape_groups) != len(set(shape_groups)):
+        raise ValueError("shape_groups contains duplicates.")
+
+    return sum(
+        len(SHAPE_GROUPS[group])
+        for group in shape_groups
+    )
+
+
+
+# def additional_datasets_holes(n_point_clouds_per_dataset: int, n_points: int):
+#     datasets = []
+#     labels = []
+
+#     logger.info("Generating additional datasets...")
+
+#     for sampling_function, label in ADDITIONAL_SHAPES:
+#         for _ in range(n_point_clouds_per_dataset):
+#             datasets.append(sampling_function(n_points))
+#             labels.append(label)
+
+#     return datasets, labels
+
+
+
+def additional_datasets_holes(
+    n_shape_variations: int,
+    n_points: int,
+):
+    datasets = []
+    labels = []
+    shape_names = []
+    shape_variation_indices = []
+
+    logger.info("Generating additional datasets...")
+
+    for shape_name, sampling_function, label in ADDITIONAL_SHAPES:
+        for variation_index in range(n_shape_variations):
+            datasets.append(
+                sampling_function(n_points)
+            )
+            labels.append(label)
+            shape_names.append(shape_name)
+            shape_variation_indices.append(variation_index)
+
+    return (
+        datasets,
+        np.asarray(labels),
+        np.asarray(shape_names),
+        np.asarray(shape_variation_indices),
+    )
+
+
+# N_TURKEVS_SHAPES = 20
+
+
+
+# def generate_turkevs_datasets(n_point_clouds: int,
+#                               n_points: int,
+#                               seed: int,
+#                               dataset_id="",
+#                               ):
+
+
+
+
+# def generate_turkevs_datasets(
+#         n_shape_variations,
+#         n_points,
+#         seed,
+#         shape_groups=("turkevs", "additional"),
+#         dataset_id="",
+# ):
+    
+#     np.random.seed(seed)
+#     logger.info("Constructing Turkevs datasets...")
+
+#     initial_point_clouds = []
+#     labels = []
+
+#     if "turkevs" in shape_groups:
+#         n_core_point_clouds = (
+#             len(TURKEVS_CORE_SHAPES) * n_shape_variations
+#         )
+
+#         core_point_clouds, core_labels, _ = build_dataset_holes(
+#             n_core_point_clouds,
+#             n_points,
+#         )
+
+#         initial_point_clouds.extend(core_point_clouds)
+#         labels.extend(core_labels)
+
+#     # initial_point_clouds, labels, _ = build_dataset_holes(n_point_clouds, n_points)
+
+#     # n_point_clouds_per_dataset = int(n_point_clouds / N_TURKEVS_SHAPES)
+#     # additional_point_clouds, additional_labels = \
+#     #     additional_datasets_holes(n_point_clouds_per_dataset, n_points)
+
+#     # initial_point_clouds.extend(additional_point_clouds)
+#     # labels = np.concatenate((labels, additional_labels))
+
+
+#     if "additional" in shape_groups:
+#         additional_point_clouds, additional_labels = (
+#             additional_datasets_holes(
+#                 n_shape_variations,
+#                 n_points,
+#             )
+#         )
+
+#         initial_point_clouds.extend(additional_point_clouds)
+#         labels.extend(additional_labels)
+    
+#     labels = np.asarray(labels)
+
+#     # for i, pc in enumerate(initial_point_clouds):
+#     #     print(type(pc))
+#     #     print(labels[i])
+#     #     print("\n")
+
+#     all_datasets: list[Dataset] = []
+#     n_shapes = get_n_shapes(shape_groups)
+#     n_standard_point_clouds = n_shapes * n_shape_variations
+
+#     if len(initial_point_clouds) != n_standard_point_clouds:
+#         raise ValueError(
+#             f"Expected {n_standard_point_clouds} standard point clouds "
+#             f"({n_shapes} shapes × {n_shape_variations} variations), "
+#             f"but generated {len(initial_point_clouds)}."
+#         )
+
+#     # if n_point_clouds != len(initial_point_clouds):
+#     #     raise ValueError("Mismatch in the number of point clouds.")
+
+#     # for transformation in TurkevsTransformation:
+#     #     logger.info(f"Applying transformation: {transformation.fullname}.")
+#     #     transformed_point_clouds = (
+#     #         initial_point_clouds if transformation is TurkevsTransformation.STANDARD
+#     #         else calculate_point_clouds_under_trnsf(initial_point_clouds,
+#     #                                                 transformation=transformation.fullname)
+#     #     )
+#     #     for mesh_index, (points,label) in enumerate(zip(transformed_point_clouds, labels)):
+#     #         dataset = Dataset(
+#     #             points=points,
+#     #             data_type="turkevs",
+#     #             additional_info=TurkevsDatasetInfo(
+#     #                 dataset_id=dataset_id,
+#     #                 seed=seed,
+#     #                 point_cloud_index=mesh_index,
+#     #                 transformation=transformation,
+#     #                 label=label,
+#     #                 n_point_clouds=n_standard_point_clouds
+#     #             )
+#     #         )
+#     #         all_datasets.append(dataset)
+
+#     for transformation in TurkevsTransformation:
+#         logger.info(f"Applying transformation: {transformation.fullname}.")
+
+#         transformed_point_clouds = (
+#             initial_point_clouds
+#             if transformation is TurkevsTransformation.STANDARD
+#             else calculate_point_clouds_under_trnsf(
+#                 initial_point_clouds,
+#                 transformation=transformation.fullname,
+#             )
+#         )
+
+#         for point_cloud_index, (points, label) in enumerate(
+#             zip(transformed_point_clouds, labels)
+#         ):
+#             dataset = Dataset(
+#                 points=points,
+#                 data_type="turkevs",
+#                 additional_info=TurkevsDatasetInfo(
+#                     dataset_id=dataset_id,
+#                     seed=seed,
+#                     point_cloud_index=point_cloud_index,
+#                     transformation=transformation,
+#                     label=label,
+
+#                     n_shapes=n_shapes,
+#                     n_shape_variations=n_shape_variations,
+#                     n_point_clouds=n_standard_point_clouds,
+#                 ),
+#             )
+#             all_datasets.append(dataset)
+
+
+    
+#     logger.info("Datasets constructed.")
+#     return all_datasets
+
+
+
+
+
+
+def generate_turkevs_datasets(
+    n_shape_variations: int,
+    n_points: int,
+    seed: int,
+    shape_groups=("turkevs", "additional"),
+    dataset_id="",
+):
     np.random.seed(seed)
     logger.info("Constructing Turkevs datasets...")
 
-    initial_point_clouds, labels, _ = build_dataset_holes(n_point_clouds, n_points)
+    shape_groups = tuple(shape_groups)
+
+    n_shapes = get_n_shapes(shape_groups)
+    n_standard_point_clouds = n_shapes * n_shape_variations
+
+    initial_point_clouds = []
+    labels = []
+    shape_names = []
+    shape_groups_per_cloud = []
+    shape_variation_indices = []
+
+    if "turkevs" in shape_groups:
+        (
+            core_point_clouds,
+            core_labels,
+            core_shape_names,
+            core_variation_indices,
+        ) = build_dataset_holes(
+            n_shape_variations=n_shape_variations,
+            n=n_points,
+        )
+
+        initial_point_clouds.extend(core_point_clouds)
+        labels.extend(core_labels)
+        shape_names.extend(core_shape_names)
+        shape_groups_per_cloud.extend(
+            ["turkevs"] * len(core_point_clouds)
+        )
+        shape_variation_indices.extend(core_variation_indices)
+
+    if "additional" in shape_groups:
+        (
+            additional_point_clouds,
+            additional_labels,
+            additional_shape_names,
+            additional_variation_indices,
+        ) = additional_datasets_holes(
+            n_shape_variations=n_shape_variations,
+            n_points=n_points,
+        )
+
+        initial_point_clouds.extend(additional_point_clouds)
+        labels.extend(additional_labels)
+        shape_names.extend(additional_shape_names)
+        shape_groups_per_cloud.extend(
+            ["additional"] * len(additional_point_clouds)
+        )
+        shape_variation_indices.extend(
+            additional_variation_indices
+        )
+
+    labels = np.asarray(labels)
+
+    if len(initial_point_clouds) != n_standard_point_clouds:
+        raise ValueError(
+            f"Expected {n_standard_point_clouds} standard point clouds "
+            f"({n_shapes} shapes x {n_shape_variations} variations), "
+            f"but generated {len(initial_point_clouds)}."
+        )
+
+
     all_datasets: list[Dataset] = []
 
-    if n_point_clouds != len(initial_point_clouds):
-        raise ValueError("Mismatch in the number of point clouds.")
-
     for transformation in TurkevsTransformation:
-        logger.info(f"Applying transformation: {transformation.fullname}.")
-        transformed_point_clouds = (
-            initial_point_clouds if transformation is TurkevsTransformation.STANDARD
-            else calculate_point_clouds_under_trnsf(initial_point_clouds,
-                                                    transformation=transformation.fullname)
+        logger.info(
+            f"Applying transformation: {transformation.fullname}."
         )
-        for mesh_index, (points,label) in enumerate(zip(transformed_point_clouds, labels)):
+
+        transformed_point_clouds = (
+            initial_point_clouds
+            if transformation is TurkevsTransformation.STANDARD
+            else calculate_point_clouds_under_trnsf(
+                initial_point_clouds,
+                transformation=transformation.fullname,
+            )
+        )
+
+        for point_cloud_index, (
+            points,
+            label,
+            shape_name,
+            shape_group,
+            shape_variation_index,
+        ) in enumerate(
+            zip(
+                transformed_point_clouds,
+                labels,
+                shape_names,
+                shape_groups_per_cloud,
+                shape_variation_indices,
+            )
+        ):
             dataset = Dataset(
                 points=points,
                 data_type="turkevs",
                 additional_info=TurkevsDatasetInfo(
                     dataset_id=dataset_id,
                     seed=seed,
-                    point_cloud_index=mesh_index,
+                    point_cloud_index=point_cloud_index,
                     transformation=transformation,
                     label=label,
-                    n_point_clouds=n_point_clouds
-                )
+
+                    shape_group=shape_group,
+                    shape_name=shape_name,
+                    shape_variation_index=int(
+                        shape_variation_index
+                    ),
+
+                    n_shapes=n_shapes,
+                    n_shape_variations=n_shape_variations,
+
+                    # Keeping for backwards compatibility.
+                    # Now has a clear meaning:
+                    # number of STANDARD point clouds.
+                    n_point_clouds=n_standard_point_clouds,
+                ),
             )
+
             all_datasets.append(dataset)
+
     logger.info("Datasets constructed.")
     return all_datasets
+
+
 
 
 
@@ -188,16 +552,63 @@ def filter_turkevs_dict(data: dict[str, list],
 
 
 
-def divide_indices_into_train_and_test(indices, train_percentage=0.8, test_percentage=0.2):
-    n_indices = len(indices)
-    train_size = int(train_percentage * n_indices)
-    test_size = int(test_percentage * n_indices)
-    train_indices = np.random.choice(indices, size=train_size, replace=False)
-    non_train_indices = np.setdiff1d(indices, train_indices)
-    test_indices = np.random.choice(non_train_indices, size=test_size, replace=False)
+# def divide_indices_into_train_and_test(indices, train_percentage=0.8, test_percentage=0.2):
+#     n_indices = len(indices)
+#     train_size = int(train_percentage * n_indices)
+#     test_size = int(test_percentage * n_indices)
+#     train_indices = np.random.choice(indices, size=train_size, replace=False)
+#     non_train_indices = np.setdiff1d(indices, train_indices)
+#     test_indices = np.random.choice(non_train_indices, size=test_size, replace=False)
+#     return train_indices, test_indices
+def divide_indices_into_train_and_test(
+    indices,
+    stratify_values,
+    train_percentage=0.8,
+    test_percentage=0.2,
+    random_state=None,
+):
+    train_indices, test_indices = train_test_split(
+        indices,
+        train_size=train_percentage,
+        test_size=test_percentage,
+        stratify=stratify_values,
+        random_state=random_state,
+        shuffle=True,
+    )
+
+    # Sorting is convenient because predictions will then correspond
+    # to increasing point_cloud_index.
+    train_indices = np.sort(train_indices)
+    test_indices = np.sort(test_indices)
+
     return train_indices, test_indices
 
 
+# @dataclass
+# class EvaluationResults:
+#     accuracy: dict
+#     pipeline_name: str
+#     parameters: Optional[Parameters] = None
+
+#     def to_dict(self):
+#         result = {
+#             "accuracy": self.accuracy,
+#             "pipeline_name": self.pipeline_name,
+#         }
+#         if self.parameters is not None:
+#             result["parameters"] = self.parameters.to_dict()
+#         return result
+
+#     @classmethod
+#     def from_dict(cls, data: dict):
+#         parameters = None
+#         if "parameters" in data and data["parameters"] is not None:
+#             parameters = Parameters.from_any_dict(data["parameters"])
+#         return cls(
+#             accuracy=data["accuracy"],
+#             pipeline_name=data["pipeline_name"],
+#             parameters=parameters
+#         )
 
 @dataclass
 class EvaluationResults:
@@ -205,25 +616,54 @@ class EvaluationResults:
     pipeline_name: str
     parameters: Optional[Parameters] = None
 
+    predictions: Optional[dict] = None
+    train_indices: Optional[list[int]] = None
+    test_indices: Optional[list[int]] = None
+    labels_test: Optional[list] = None
+    split_seed: Optional[int] = None
+
     def to_dict(self):
         result = {
             "accuracy": self.accuracy,
             "pipeline_name": self.pipeline_name,
+            "predictions": self.predictions,
+            "train_indices": self.train_indices,
+            "test_indices": self.test_indices,
+            "labels_test": self.labels_test,
+            "split_seed": self.split_seed,
         }
+
         if self.parameters is not None:
             result["parameters"] = self.parameters.to_dict()
+
         return result
 
     @classmethod
     def from_dict(cls, data: dict):
         parameters = None
-        if "parameters" in data and data["parameters"] is not None:
-            parameters = Parameters.from_any_dict(data["parameters"])
+
+        if (
+            "parameters" in data
+            and data["parameters"] is not None
+        ):
+            parameters = Parameters.from_any_dict(
+                data["parameters"]
+            )
+
         return cls(
             accuracy=data["accuracy"],
             pipeline_name=data["pipeline_name"],
-            parameters=parameters
+            parameters=parameters,
+
+            # .get() keeps OLD classification files readable.
+            predictions=data.get("predictions"),
+            train_indices=data.get("train_indices"),
+            test_indices=data.get("test_indices"),
+            labels_test=data.get("labels_test"),
+            split_seed=data.get("split_seed"),
         )
+
+
 
 
 
@@ -268,6 +708,39 @@ def get_labels_sorted(datasets: list[Dataset]) -> np.ndarray:
 
 
 
+def get_shape_names_sorted(datasets: list[Dataset]) -> np.ndarray:
+    """
+    Returns shape names for the standard datasets, sorted by point_cloud_index.
+    """
+    standard_datasets = [
+        d for d in datasets
+        if isinstance(d.additional_info, TurkevsDatasetInfo)
+        and d.additional_info.transformation == TurkevsTransformation.STANDARD
+    ]
+
+    standard_datasets_sorted = sorted(
+        standard_datasets,
+        key=lambda d: cast(
+            TurkevsDatasetInfo,
+            d.additional_info
+        ).point_cloud_index,
+    )
+
+    shape_names = [
+        cast(TurkevsDatasetInfo, d.additional_info).shape_name
+        for d in standard_datasets_sorted
+    ]
+
+    if any(shape_name is None for shape_name in shape_names):
+        raise ValueError(
+            "Cannot stratify by shape_name because some datasets "
+            "do not contain shape_name metadata."
+        )
+
+    return np.asarray(shape_names)
+
+
+
 def get_barcodes_dim_1_per_parameters_per_transformation_sorted(experiment_summaries: list[ExperimentSummary]) \
         -> dict[Parameters, dict[str, list[np.ndarray]]]:
     """
@@ -291,11 +764,33 @@ def get_barcodes_dim_1_per_parameters_per_transformation_sorted(experiment_summa
     for params, barcodes_by_transformation in grouped.items():
         sorted_and_filtered[params] = {}
         for t, point_cloud_index_and_barcodes in barcodes_by_transformation.items():
-            sorted_barcodes = [np.asarray(filter_barcode(barcode=barcode, dim=1))
-                               for _, barcode in sorted(point_cloud_index_and_barcodes,
-                                                        key=lambda x: x[0])]
-            padded_barcodes = pad_to_max_length(sorted_barcodes)
-            sorted_and_filtered[params][t] = padded_barcodes
+            # sorted_barcodes = [np.asarray(filter_barcode(barcode=barcode, dim=1))
+            #                    for _, barcode in sorted(point_cloud_index_and_barcodes,
+            #                                             key=lambda x: x[0])]
+            # padded_barcodes = pad_to_max_length(sorted_barcodes)
+            # sorted_and_filtered[params][t] = padded_barcodes
+            #
+            sorted_barcodes = []
+
+            for _, barcode in sorted(
+                    point_cloud_index_and_barcodes,
+                    key=lambda x: x[0],
+            ):
+                pd = np.asarray(
+                    filter_barcode(barcode=barcode, dim=1),
+                    dtype=float,
+                )
+
+                # Important for empty H1 diagrams:
+                # keep them as valid (0, 2) persistence diagrams.
+                if pd.size == 0:
+                    pd = np.empty((0, 2), dtype=float)
+                else:
+                    pd = pd.reshape(-1, 2)
+
+                sorted_barcodes.append(pd)
+
+            sorted_and_filtered[params][t] = sorted_barcodes
 
     return sorted_and_filtered
 
@@ -328,25 +823,70 @@ def get_scores_under_trnsfs(data_trnsfs, trnsfs, labels, model):
 
 
 
-def test_model(model_trained,
-               data_test,
-               labels_test):
-    logger.info("Testing the model by evaluating noise robustness...")
-    trnsfs = [transformation.shortname for transformation in TurkevsTransformation]
-    accs_trnsfs = get_scores_under_trnsfs(data_test,trnsfs,labels_test,model_trained)
+# def test_model(model_trained,
+#                data_test,
+#                labels_test):
+#     logger.info("Testing the model by evaluating noise robustness...")
+#     trnsfs = [transformation.shortname for transformation in TurkevsTransformation]
+#     accs_trnsfs = get_scores_under_trnsfs(data_test,trnsfs,labels_test,model_trained)
+#     logger.info("Testing completed.")
+#     return accs_trnsfs
+
+def test_model(
+    model_trained,
+    data_test,
+    labels_test,
+):
+    logger.info(
+        "Testing the model by evaluating noise robustness..."
+    )
+
+    trnsfs = [
+        transformation.shortname
+        for transformation in TurkevsTransformation
+    ]
+
+    accs_trnsfs = {}
+    predictions_trnsfs = {}
+
+    for t in trnsfs:
+        data = data_test[t]
+
+        accs_trnsfs[t] = get_score(
+            data,
+            labels_test,
+            model_trained,
+        )
+
+        predictions = model_trained.predict(data)
+
+        predictions_trnsfs[t] = (
+            np.asarray(predictions).tolist()
+        )
+
     logger.info("Testing completed.")
-    return accs_trnsfs
+
+    return accs_trnsfs, predictions_trnsfs
 
 
 
+# def evaluate_model(
+#         data_per_transformations,
+#         labels,
+#         train_indices,
+#         test_indices,
+#         ml_module,
+#         pipeline_name
+#         ) -> EvaluationResults:
 def evaluate_model(
         data_per_transformations,
         labels,
         train_indices,
         test_indices,
         ml_module,
-        pipeline_name
-        ) -> EvaluationResults:
+        pipeline_name,
+        split_seed=None,
+) -> EvaluationResults:
     logger.info(f"Running pipeline {pipeline_name}...")
     labels_train = labels[train_indices]
     labels_test = labels[test_indices]
@@ -357,29 +897,111 @@ def evaluate_model(
         data_train = np.asarray(data_train)
         data_test_per_transformations = {t: np.asarray(data_test_per_transformations[t]) for t in data_test_per_transformations}
 
-    model_trained = train_model(ml_module, data_train, labels_train)
-    accs_trnsfs = test_model(model_trained, data_test_per_transformations, labels_test)
-    return EvaluationResults(pipeline_name=pipeline_name, accuracy=accs_trnsfs)
+    # model_trained = train_model(ml_module, data_train, labels_train)
+    # accs_trnsfs = test_model(model_trained, data_test_per_transformations, labels_test)
+    # return EvaluationResults(pipeline_name=pipeline_name, accuracy=accs_trnsfs)
+    model_trained = train_model(
+        ml_module,
+        data_train,
+        labels_train,
+    )
+
+    accs_trnsfs, predictions_trnsfs = test_model(
+        model_trained,
+        data_test_per_transformations,
+        labels_test,
+    )
+
+    return EvaluationResults(
+        pipeline_name=pipeline_name,
+        accuracy=accs_trnsfs,
+        predictions=predictions_trnsfs,
+        # Convert numpy values to normal Python values for JSON.
+        train_indices=np.asarray(train_indices).astype(int).tolist(),
+        test_indices=np.asarray(test_indices).astype(int).tolist(),
+        labels_test=np.asarray(labels_test).tolist(),
+        split_seed=split_seed,
+    )
 
 
+# def get_train_and_test_indices(datasets_per_transformation: dict["str", list]):
+#     logger.info("Generating train and test indices...")
+#     n_std_point_clouds = len(datasets_per_transformation[TurkevsTransformation.STANDARD.shortname])
+#     indices = np.arange(n_std_point_clouds)
+#     logger.info("Train and test indices generated.")
+#     train_indices, test_indices = divide_indices_into_train_and_test(indices)
+#     return train_indices, test_indices
+def get_train_and_test_indices(
+    datasets_per_transformation,
+    stratify_values,
+    random_state=None,
+):
+    logger.info("Generating stratified train and test indices...")
 
-def get_train_and_test_indices(datasets_per_transformation: dict["str", list]):
-    logger.info("Generating train and test indices...")
-    n_std_point_clouds = len(datasets_per_transformation[TurkevsTransformation.STANDARD.shortname])
+    n_std_point_clouds = len(
+        datasets_per_transformation[
+            TurkevsTransformation.STANDARD.shortname
+        ]
+    )
+
+    if len(stratify_values) != n_std_point_clouds:
+        raise ValueError(
+            "stratify_values and standard point clouds "
+            "have different lengths."
+        )
+
     indices = np.arange(n_std_point_clouds)
+
+    train_indices, test_indices = (
+        divide_indices_into_train_and_test(
+            indices=indices,
+            stratify_values=stratify_values,
+            random_state=random_state,
+        )
+    )
+
     logger.info("Train and test indices generated.")
-    train_indices, test_indices = divide_indices_into_train_and_test(indices)
+
     return train_indices, test_indices
 
 
+# def point_clouds_from_scratch(n_point_clouds, n_points) -> tuple[dict["str", list], np.ndarray]:
+#     from ellipsoids.turkevs.data_construction import build_dataset_holes
+#     data_pc, labels, _ = build_dataset_holes(n_point_clouds,n_points)
+#     data_pc_trnsfs: dict["str", list] = {t.shortname: data_construction.calculate_point_clouds_under_trnsf(data_pc, t.fullname)
+#                       for t in TurkevsTransformation if t is not TurkevsTransformation.STANDARD}
+#     data_pc_trnsfs[TurkevsTransformation.STANDARD.shortname] = data_pc
+#     return data_pc_trnsfs, labels
 
-def point_clouds_from_scratch(n_point_clouds, n_points) -> tuple[dict["str", list], np.ndarray]:
-    from ellipsoids.turkevs.data_construction import build_dataset_holes
-    data_pc, labels, _ = build_dataset_holes(n_point_clouds,n_points)
-    data_pc_trnsfs: dict["str", list] = {t.shortname: data_construction.calculate_point_clouds_under_trnsf(data_pc, t.fullname)
-                      for t in TurkevsTransformation if t is not TurkevsTransformation.STANDARD}
-    data_pc_trnsfs[TurkevsTransformation.STANDARD.shortname] = data_pc
+
+
+def point_clouds_from_scratch(
+    n_shape_variations,
+    n_points,
+) -> tuple[dict[str, list], np.ndarray]:
+
+    data_pc, labels, _, _ = build_dataset_holes(
+        n_shape_variations=n_shape_variations,
+        n=n_points,
+    )
+
+    data_pc_trnsfs = {
+        t.shortname:
+            data_construction.calculate_point_clouds_under_trnsf(
+                data_pc,
+                t.fullname,
+            )
+        for t in TurkevsTransformation
+        if t is not TurkevsTransformation.STANDARD
+    }
+
+    data_pc_trnsfs[
+        TurkevsTransformation.STANDARD.shortname
+    ] = data_pc
+
     return data_pc_trnsfs, labels
+
+
 
 
 
@@ -466,15 +1088,34 @@ class PreprocessingCache:
 
 
 
-def calculate_alpha_pde1_per_trnsf(datasets_per_transformation_sorted, trnsfs = TurkevsTransformation.shortnames()):
+# def calculate_alpha_pde1_per_trnsf(datasets_per_transformation_sorted, trnsfs = TurkevsTransformation.shortnames()):
+#     return {
+#         t: ph.calculate_pds_point_clouds(datasets_per_transformation_sorted[t],
+#                                         fil_complex="alpha",
+#                                         fil_fun="dtm",
+#                                         m=0.03,
+#                                         p=1)[1]
+#         for t in trnsfs
+#     }
+
+
+def calculate_alpha_pde1_per_trnsf(
+    datasets_per_transformation_sorted,
+    trnsfs=TurkevsTransformation.shortnames(),
+):
     return {
-        t: ph.calculate_pds_point_clouds(datasets_per_transformation_sorted[t],
-                                        fil_complex="alpha",
-                                        fil_fun="dtm",
-                                        m=0.03,
-                                        p=1)[1]
+        t: ph.calculate_pds_point_clouds(
+            datasets_per_transformation_sorted[t],
+            fil_complex="alpha",
+            fil_fun="dtm",
+            m=0.03,
+            p=1,
+            pad=False,
+        )[1]
         for t in trnsfs
     }
+
+
 
 
 
@@ -503,7 +1144,7 @@ def calculate_3d_point_clouds_per_trnsf(datasets_per_transformation_sorted, trns
 
 
 def make_consecutive_labels(labels):
-    return data_construction.encode_labels(labels)
+    return data_construction.encode_labels(labels)[0]
 
 
 
@@ -559,18 +1200,78 @@ pipeline_registry = {
 
 
 
+# def make_parameter_filter(**criteria):
+#     def filter_fn(params):
+#         for attr, expected_value in criteria.items():
+#             value = getattr(params, attr, None)
+#             if isinstance(expected_value, (list, tuple, set)):
+#                 if value not in expected_value:
+#                     return False
+#             else:
+#                 if value != expected_value:
+#                     return False
+#         return True
+#     return filter_fn
+
+# def make_parameter_filter(**criteria):
+#     def filter_fn(params):
+#         for attr, expected_value in criteria.items():
+#             value = getattr(params, attr, None)
+
+#             if expected_value is None:
+#                 if value is not None:
+#                     return False
+
+#             elif isinstance(expected_value, (list, tuple, set)):
+#                 # Handle array comparisons
+#                 if isinstance(value, np.ndarray):
+#                     found_match = any(np.array_equal(value, ev) for ev in expected_value)
+#                     if not found_match:
+#                         return False
+#                 else:
+#                     if value not in expected_value:
+#                         return False
+
+#             else:
+#                 if isinstance(value, np.ndarray) and isinstance(expected_value, np.ndarray):
+#                     if not np.array_equal(value, expected_value):
+#                         return False
+#                 else:
+#                     if value != expected_value:
+#                         return False
+
+#         return True
+
+#     return filter_fn
+
 def make_parameter_filter(**criteria):
     def filter_fn(params):
         for attr, expected_value in criteria.items():
             value = getattr(params, attr, None)
-            if isinstance(expected_value, (list, tuple, set)):
-                if value not in expected_value:
+
+            if expected_value is None:
+                if value is not None:
                     return False
+
+            elif isinstance(expected_value, (list, tuple, set)):
+                if isinstance(value, np.ndarray):
+                    if not any(np.array_equal(value, ev) for ev in expected_value):
+                        return False
+                else:
+                    if value not in expected_value:
+                        return False
+
             else:
-                if value != expected_value:
-                    return False
-            return True
+                if isinstance(value, np.ndarray) or isinstance(expected_value, np.ndarray):
+                    if not np.array_equal(value, expected_value):
+                        return False
+                else:
+                    if value != expected_value:
+                        return False
+
+        return True
     return filter_fn
+
 
 
 
@@ -596,7 +1297,7 @@ class AggregatedResults():
 
 
 
-def calculate_aggregated_classification_results(results_folder: str):
+def calculate_aggregated_classification_results(results_folder: str) -> list[AggregatedResults]:
     paths = get_paths_of_files_in_a_folder(results_folder, ".json")
     if len(paths) == 0:
         raise ValueError("Error: no valid paths found.")
@@ -617,11 +1318,11 @@ def calculate_aggregated_classification_results(results_folder: str):
         acc_mean = {t: np.mean([acc[t] for acc in acc_list]) for t in trnsf}
         acc_sd = {t: np.std([acc[t] for acc in acc_list]) for t in trnsf}
         aggregated_results.append(AggregatedResults(parameters=params,
-                                                                 mean_accuracy_per_trnsf=acc_mean,
-                                                                 sd_accuracy_per_trnsf=acc_sd,
-                                                                 n_runs=len(acc_list),
-                                                                 pipeline_name=pipeline_name,
-                                                                 results_label=pipeline_name))
+                                                    mean_accuracy_per_trnsf=acc_mean,
+                                                    sd_accuracy_per_trnsf=acc_sd,
+                                                    n_runs=len(acc_list),
+                                                    pipeline_name=pipeline_name,
+                                                    results_label=pipeline_name))
     return sort_aggregated_results(aggregated_results)
 
 
@@ -670,7 +1371,7 @@ def plot_aggregated_results(aggregated_results_per_datatype,
     average_accs = plot_data
     results_labels = list(plot_data.keys())
 
-    title = f"Mean classification accuracy per transformation (≥{min_n_runs} runs)\n\n"
+    title = f"Mean classification accuracy per transformation ({min_n_runs} runs)\n\n"
     plots.plot_bar_chart(transformations, average_accs, results_labels, err_data, title)
     plt.savefig(output_path, bbox_inches = "tight")
 
@@ -743,3 +1444,353 @@ def convert_json_files_to_jsonl(folder: str, output_path: str, compress: bool = 
                 f_out.write(json.dumps(data, separators=(",", ":")) + "\n")
             except OSError as e:
                 logger.error(f"I/O error while processing {path}: {e}")
+
+
+
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+        
+def plot_turkevs_datasets(
+    datasets: list[Dataset],
+    marker_size: float = 3,
+    height_per_row: int = 250,
+    width_per_col: int = 800,
+):
+    """
+    Plot Turkevs point clouds in a grid.
+
+    Rows:
+        transformations, in TurkevsTransformation enum order
+
+    Columns:
+        point_cloud_index
+
+    The number of point clouds / columns is inferred automatically
+    from the supplied Dataset objects.
+
+    Parameters
+    ----------
+    datasets:
+        List of Dataset objects with TurkevsDatasetInfo as additional_info.
+
+    marker_size:
+        Size of Plotly markers.
+
+    height_per_row:
+        Approximate subplot height.
+
+    width_per_col:
+        Approximate subplot width.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
+
+    # ------------------------------------------------------------
+    # Keep only Turkevs datasets
+    # ------------------------------------------------------------
+
+    datasets = [
+        dataset
+        for dataset in datasets
+        if dataset.data_type == "turkevs"
+        and isinstance(dataset.additional_info, TurkevsDatasetInfo)
+    ]
+
+    if not datasets:
+        raise ValueError("No Turkevs datasets found.")
+
+    transformations = list(TurkevsTransformation)
+
+    # ------------------------------------------------------------
+    # Determine point clouds / columns dynamically
+    # ------------------------------------------------------------
+
+    point_cloud_indices = sorted({
+        dataset.additional_info.point_cloud_index
+        for dataset in datasets
+    })
+
+    n_columns = len(point_cloud_indices)
+    n_rows = len(transformations)
+
+    # Map actual point_cloud_index -> Plotly column number
+    column_for_index = {
+        point_cloud_index: i + 1
+        for i, point_cloud_index in enumerate(point_cloud_indices)
+    }
+
+    # ------------------------------------------------------------
+    # Build lookup:
+    #
+    # (point_cloud_index, transformation) -> Dataset
+    # ------------------------------------------------------------
+
+    dataset_lookup = {}
+
+    for dataset in datasets:
+        info = dataset.additional_info
+
+        key = (
+            info.point_cloud_index,
+            info.transformation,
+        )
+
+        if key in dataset_lookup:
+            raise ValueError(
+                "Multiple datasets found for "
+                f"point_cloud_index={info.point_cloud_index}, "
+                f"transformation={info.transformation.fullname}."
+            )
+
+        dataset_lookup[key] = dataset
+
+    # ------------------------------------------------------------
+    # Determine dimensionality of each column
+    # ------------------------------------------------------------
+
+    dimensions = {}
+
+    for point_cloud_index in point_cloud_indices:
+
+        column_datasets = [
+            dataset
+            for dataset in datasets
+            if dataset.additional_info.point_cloud_index == point_cloud_index
+        ]
+
+        dims = {
+            dataset.ambient_dim
+            for dataset in column_datasets
+        }
+
+        if not dims <= {2, 3}:
+            raise ValueError(
+                f"Point cloud {point_cloud_index} has unsupported "
+                f"dimension(s): {dims}"
+            )
+
+        if len(dims) != 1:
+            raise ValueError(
+                f"Point cloud {point_cloud_index} mixes dimensions: {dims}"
+            )
+
+        dimensions[point_cloud_index] = dims.pop()
+
+    # ------------------------------------------------------------
+    # Subplot types
+    # ------------------------------------------------------------
+
+    specs = []
+
+    for _ in transformations:
+        row_specs = []
+
+        for point_cloud_index in point_cloud_indices:
+            dimension = dimensions[point_cloud_index]
+
+            row_specs.append(
+                {"type": "xy"}
+                if dimension == 2
+                else {"type": "scene"}
+            )
+
+        specs.append(row_specs)
+
+    # ------------------------------------------------------------
+    # Column labels
+    # ------------------------------------------------------------
+
+    column_titles = [
+        f"Point cloud {idx}"
+        for idx in point_cloud_indices
+    ]
+
+    # ------------------------------------------------------------
+    # Create figure
+    # ------------------------------------------------------------
+
+    fig = make_subplots(
+        rows=n_rows,
+        cols=n_columns,
+        specs=specs,
+        column_titles=column_titles,
+        horizontal_spacing=0.03,
+        vertical_spacing=0.03,
+    )
+
+    # ------------------------------------------------------------
+    # Add traces
+    # ------------------------------------------------------------
+
+    for row_idx, transformation in enumerate(transformations, start=1):
+
+        for point_cloud_index in point_cloud_indices:
+
+            col_idx = column_for_index[point_cloud_index]
+
+            key = (
+                point_cloud_index,
+                transformation,
+            )
+
+            # Allow missing transformations
+            if key not in dataset_lookup:
+                continue
+
+            dataset = dataset_lookup[key]
+            points = np.asarray(dataset.points)
+
+            # -------------------------
+            # 2D
+            # -------------------------
+
+            if dataset.ambient_dim == 2:
+
+                fig.add_trace(
+                    go.Scattergl(
+                        x=points[:, 0],
+                        y=points[:, 1],
+                        mode="markers",
+                        marker=dict(
+                            size=marker_size,
+                        ),
+                        showlegend=False,
+                        customdata=np.full(
+                            len(points),
+                            transformation.fullname,
+                            dtype=object,
+                        ),
+                        hovertemplate=(
+                            f"Point cloud: {point_cloud_index}<br>"
+                            f"Transformation: {transformation.fullname}<br>"
+                            "x=%{x:.4f}<br>"
+                            "y=%{y:.4f}"
+                            "<extra></extra>"
+                        ),
+                    ),
+                    row=row_idx,
+                    col=col_idx,
+                )
+
+                fig.update_xaxes(
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    title_text=None,
+                    row=row_idx,
+                    col=col_idx,
+                )
+
+                fig.update_yaxes(
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    title_text=None,
+                    row=row_idx,
+                    col=col_idx,
+                )
+
+            # -------------------------
+            # 3D
+            # -------------------------
+
+            elif dataset.ambient_dim == 3:
+
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=points[:, 0],
+                        y=points[:, 1],
+                        z=points[:, 2],
+                        mode="markers",
+                        marker=dict(
+                            size=marker_size,
+                            opacity=0.8,
+                        ),
+                        showlegend=False,
+                        hovertemplate=(
+                            f"Point cloud: {point_cloud_index}<br>"
+                            f"Transformation: {transformation.fullname}<br>"
+                            "x=%{x:.4f}<br>"
+                            "y=%{y:.4f}<br>"
+                            "z=%{z:.4f}"
+                            "<extra></extra>"
+                        ),
+                    ),
+                    row=row_idx,
+                    col=col_idx,
+                )
+
+    # ------------------------------------------------------------
+    # Clean up 3D scenes
+    # ------------------------------------------------------------
+
+    for key in fig.layout:
+        if str(key).startswith("scene"):
+            fig.layout[key].update(
+                aspectmode="data",
+                xaxis=dict(
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    showbackground=False,
+                    title="",
+                ),
+                yaxis=dict(
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    showbackground=False,
+                    title="",
+                ),
+                zaxis=dict(
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    showbackground=False,
+                    title="",
+                ),
+            )
+
+    # ------------------------------------------------------------
+    # Row labels
+    # ------------------------------------------------------------
+
+    for i, transformation in enumerate(transformations):
+
+        y = 1 - (i + 0.5) / n_rows
+
+        fig.add_annotation(
+            x=-0.015,
+            y=y,
+            xref="paper",
+            yref="paper",
+            text=transformation.fullname.title(),
+            showarrow=False,
+            xanchor="right",
+            yanchor="middle",
+            textangle=-90,
+            font=dict(size=13),
+        )
+
+    # ------------------------------------------------------------
+    # Layout
+    # ------------------------------------------------------------
+
+    fig.update_layout(
+        width=max(
+            700,
+            width_per_col * n_columns,
+        ),
+        height=height_per_row * n_rows,
+        margin=dict(
+            l=100,
+            r=20,
+            t=70,
+            b=30,
+        ),
+        template="plotly_white",
+    )
+
+    return fig

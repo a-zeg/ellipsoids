@@ -16,6 +16,7 @@ def main():
 
     dataset = Dataset(sample_from_circle(20), "circle")
     parameters = EllipsoidParameters(
+        nbhd_size=3,
         save_simplex_tree=True,
         save_ellipsoid_list=True,
         axes_ratios=np.asarray([2,1]),
@@ -30,7 +31,7 @@ def main():
     experiment.plot_parameters.draw_points = True
     experiment.plot_parameters.draw_ellipsoids = True
     experiment.plot_parameters.draw_simplex_tree = True
-    experiment.plot_parameters.filtration = 0.8
+    experiment.plot_parameters.filtration = 0.2
 
     plot_experiment(experiment)
 

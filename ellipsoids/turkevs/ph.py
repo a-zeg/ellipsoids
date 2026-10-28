@@ -49,28 +49,71 @@ def calculate_pds(X, fil_complex = "rips", fil_fun = "distance", m = 0.001, p = 
 
 
 
-def calculate_pds_point_clouds(point_clouds, fil_complex = "rips", fil_fun = "distance", m = 0.001, p = 1):
+# def calculate_pds_point_clouds(point_clouds, fil_complex = "rips", fil_fun = "distance", m = 0.001, p = 1):
+#     pds0 = []
+#     pds1 = []
+
+#     for X in point_clouds:
+#         pd0, pd1 = calculate_pds(X, fil_complex, fil_fun, m, p)
+#         pds0.append(pd0)
+#         pds1.append(pd1)   
+    
+#     # Transform list of 0-dim PDs with different number of cycles into an array of PDs with the same number of cycles.     
+#     pds0_length = [len(pd) for pd in pds0]
+#     max_pd_length  = max(pds0_length)    
+#     pds0 = extend_pds_to_length(pds0, max_pd_length)
+    
+#     # Transform list of 1-dim PDs with different number of cycles into an array of PDs with the same number of cycles.    
+#     pds1_length = [len(pd) for pd in pds1]
+#     max_pd_length  = max(pds1_length)   
+#     pds1 = extend_pds_to_length(pds1, max_pd_length)
+    
+#     # print("pds0.shape = ", pds0.shape)
+#     # print("pds1.shape = ", pds1.shape)
+#     return pds0, pds1
+
+def calculate_pds_point_clouds(
+    point_clouds,
+    fil_complex="rips",
+    fil_fun="distance",
+    m=0.001,
+    p=1,
+    pad=True,
+):
     pds0 = []
     pds1 = []
 
     for X in point_clouds:
-        pd0, pd1 = calculate_pds(X, fil_complex, fil_fun, m, p)
+        pd0, pd1 = calculate_pds(
+            X,
+            fil_complex,
+            fil_fun,
+            m,
+            p,
+        )
+
         pds0.append(pd0)
-        pds1.append(pd1)   
-    
-    # Transform list of 0-dim PDs with different number of cycles into an array of PDs with the same number of cycles.     
-    pds0_length = [len(pd) for pd in pds0]
-    max_pd_length  = max(pds0_length)    
-    pds0 = extend_pds_to_length(pds0, max_pd_length)
-    
-    # Transform list of 1-dim PDs with different number of cycles into an array of PDs with the same number of cycles.    
-    pds1_length = [len(pd) for pd in pds1]
-    max_pd_length  = max(pds1_length)   
-    pds1 = extend_pds_to_length(pds1, max_pd_length)
-    
-    # print("pds0.shape = ", pds0.shape)
-    # print("pds1.shape = ", pds1.shape)
+        pds1.append(pd1)
+
+    if pad:
+        pds0_length = [len(pd) for pd in pds0]
+        max_pd_length = max(pds0_length)
+        pds0 = extend_pds_to_length(
+            pds0,
+            max_pd_length,
+        )
+
+        pds1_length = [len(pd) for pd in pds1]
+        max_pd_length = max(pds1_length)
+        pds1 = extend_pds_to_length(
+            pds1,
+            max_pd_length,
+        )
+
     return pds0, pds1
+
+
+
 
 
 

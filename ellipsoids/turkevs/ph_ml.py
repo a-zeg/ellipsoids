@@ -45,7 +45,8 @@ def tune_hyperparameters(pds_train, labels_train, min_b = 0, max_b = 2, min_d = 
                          ("classifier", classifier )])  
     
     pds_nums_cycles = [len(pd) for pd in pds_train]
-    max_num_cycles = max(pds_nums_cycles)
+    # max_num_cycles = max(pds_nums_cycles)
+    max_num_cycles = max(1, max(pds_nums_cycles))
     
     param_grid = [{"PH":                  [FunctionTransformer()],
                    "PH__func":            [ph.sorted_lifespans_pds],

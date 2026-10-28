@@ -23,15 +23,16 @@ from ellipsoids.turkevs.turkevs_utils import evaluate_model
 from ellipsoids.turkevs.turkevs_utils import PreprocessingCache
 from ellipsoids.turkevs.turkevs_utils import pipeline_registry
 from ellipsoids.turkevs.config import get_datasets_path
+from ellipsoids.turkevs.turkevs_utils import get_shape_names_sorted
 
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main(split_seed=None):
 
-    setup_path = "data/turkevs/turkevs_npc=100_np=20_s=0"
+    setup_path = "data/turkevs/turkevs_ns=27_nsv=5_np=600_s=0"
     pipelines = [
         CModels.PHE,
         CModels.PH,
@@ -50,7 +51,12 @@ def main():
     datasets = read_turkevs_datasets(datasets_path)
     datasets_per_transformation_sorted = get_datasets_per_transformation_sorted(datasets)
     labels = get_labels_sorted(datasets)
-    train_indices, test_indices = get_train_and_test_indices(datasets_per_transformation_sorted)
+    shape_names = get_shape_names_sorted(datasets)
+    train_indices, test_indices = get_train_and_test_indices(
+        datasets_per_transformation=datasets_per_transformation_sorted,
+        stratify_values=shape_names,
+        random_state=split_seed,
+    )
     special_pipelines = [CModels.PHE if CModels.PHE in pipelines else None]
     regular_pipelines = [p for p in pipelines if p not in special_pipelines]
 
@@ -72,7 +78,9 @@ def main():
                 train_indices,
                 test_indices,
                 current_pipeline_setup["model_module"],
-                model_key.name)
+                model_key.name,
+                split_seed=split_seed,
+            )
             pde_accuracy.parameters = parameters
             evaluation_results.append(pde_accuracy)
 
@@ -97,7 +105,9 @@ def main():
             train_indices,
             test_indices,
             model_module,
-            model_key.name)
+            model_key.name,
+            split_seed=split_seed,
+        )
         evaluation_results.append(accuracy)
 
     classification_results_path = get_classification_results_path(setup_path)
@@ -107,8 +117,9 @@ def main():
 
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    n_runs = 10
-    for _ in np.arange(n_runs):
-        main()
+    n_runs = 24
+
+    for split_seed in range(n_runs):
+        main(split_seed=split_seed)

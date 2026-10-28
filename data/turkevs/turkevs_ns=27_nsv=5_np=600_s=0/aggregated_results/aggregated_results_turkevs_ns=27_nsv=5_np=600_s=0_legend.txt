@@ -1,0 +1,13 @@
+Mean classification accuracy per transformation (24 runs)
+
+ legend:
+
+PHE [1]:
+{'expansion_dim': 2, 'collapse_edges': True, 'complex_type': 'ELLIPSOID', 'complex_subtype': 'RIPS', 'save_simplex_tree': False, 'nbhd_size': 20, 'axes_ratios': (np.float64(2.5), np.float64(1.0)), 'axes': None, 'r_spherisize': inf, 'save_ellipsoid_list': False, 'use_cache': True}
+
+PHE [2]:
+{'expansion_dim': 2, 'collapse_edges': True, 'complex_type': 'ELLIPSOID', 'complex_subtype': 'RIPS', 'save_simplex_tree': False, 'nbhd_size': 20, 'axes_ratios': None, 'axes': None, 'r_spherisize': inf, 'save_ellipsoid_list': False, 'use_cache': True}
+
+PHR:
+{'expansion_dim': 2, 'collapse_edges': True, 'complex_type': 'BALL', 'complex_subtype': 'RIPS', 'save_simplex_tree': False}
+

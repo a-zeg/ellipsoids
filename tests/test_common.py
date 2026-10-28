@@ -66,12 +66,12 @@ def test_Dataset_constructor(dataset_data):
 def test_Dataset_n_points(dataset_data):
     dataset1, _, _ = dataset_data
 
-    assert dataset1.n_points() == len(dataset1.points)
+    assert dataset1.n_points == len(dataset1.points)
 
 def test_Dataset_ambient_dim(dataset_data):
     dataset1, points, _ = dataset_data
 
-    assert dataset1.ambient_dim() == len(points[0])
+    assert dataset1.ambient_dim == len(points[0])
 
 def test_Dataset_to_dict(dataset_data):
     dataset1, points, data_type = dataset_data
@@ -284,33 +284,14 @@ def test_ellipsoid_parameters_from_dict_invalid():
 
 
 
+
 # import pytest
-# from unittest.mock import patch, MagicMock
 # from datetime import datetime
+# from unittest.mock import patch, MagicMock
+# import numpy as np
 # from ellipsoids.common import Experiment, Dataset, Parameters, Results, ComplexType, ComplexSubtype
 # from ellipsoids.data_handling import CustomEncoder
-
-# @pytest.fixture
-# def mock_objects():
-
-#     mock_dataset = MagicMock(Dataset, autospec = True)
-#     mock_parameters = MagicMock(Parameters)
-#     mock_results = MagicMock(Results)
-
-#     mock_dataset.data_type = 'example_data'
-#     mock_dataset.points = np.asarray([[0,0],[0,1]])
-#     # mock_dataset.n_points.return_value = len(mock_dataset.points)  # Mock n_points() to return 2
-#     # mock_dataset.n_points = 2
-#     mock_parameters.complex_type = ComplexType.BALL
-#     mock_parameters.complex_subtype = ComplexSubtype.RIPS
-#     mock_results.execution_time = 123.45
-
-#     mock_dataset.to_dict.return_value = {'data_type': 'example_data', 'points': [[0,0],[0,1]]}
-#     mock_parameters.to_dict.return_value = {'complex_type': 'BALL', 'complex_subtype': 'Rips'}
-#     mock_results.to_dict.return_value = {'execution_time': 123.45}
-
-#     return mock_dataset, mock_parameters, mock_results
-
+# import json
 
 # @pytest.fixture
 # def mock_current_time():
@@ -318,79 +299,30 @@ def test_ellipsoid_parameters_from_dict_invalid():
 #         mock_datetime.now.return_value = datetime(2025, 2, 25, 12, 0, 0)
 #         yield mock_datetime
 
+# # Integration test function for save_to_json
+# def test_save_to_json_integration(mock_current_time):
+#     dataset = Dataset(data_type="example_data", points=np.array([[0, 0], [0, 1]]))
+#     parameters = Parameters(complex_type=ComplexType.BALL, complex_subtype=ComplexSubtype.RIPS)
+#     results = Results()
+#     results.execution_time = 123.45
+#     experiment = Experiment(dataset, parameters)
+#     experiment.results = results
 
-# def test_save_to_json(mock_objects, mock_current_time):
-#     mock_dataset, mock_parameters, mock_results = mock_objects
-
-#     experiment = Experiment(mock_dataset, mock_parameters)
-#     experiment.results = mock_results
-
-#     # Patch open and json.dumps to mock file I/O
 #     with patch("builtins.open", new_callable=MagicMock) as mock_open, patch("json.dumps") as mock_json_dumps:
-#         expected_filename = 'example_data-2_BALL-Rips__20250225_120000.json'
-
-#         # Mock the return value of json.dumps to prevent actual file writing
-#         mock_json_dumps.return_value \
-#             = '{"dataset": {"data_type": "example_data", "points": [[0,0],[0,1]]}, \
-#                 "parameters": {"complex_type": "BALL", "complex_subtype": "Rips"}, \
-#                 "results": {"execution_time": 123.45}}'
-
-#         # Print debug output for the filename generation
-#         print(f"Generated filename: {expected_filename}")
-
+#         # Define the expected filename and mock return value for json.dumps
+#         expected_filepath = 'data/example_data-2_BALL-Rips__20250225_120000.json'
+#         # Call the save_to_json method (this is where we want to test the real behavior)
 #         experiment.save_to_json()
 
-#         print(f"open call arguments: {mock_open.call_args}")
-#         mock_open.assert_called_once_with(expected_filename, 'w')
+#         # Assert that the correct file was created
+#         mock_open.assert_called_once_with(expected_filepath, 'w')
 
+#         # Assert that json.dumps was called with the correct data
 #         expected_data = {
-#             'dataset': {'data_type': 'example_data', 'points': [[0,0],[0,1]]},
-#             'parameters': {'complex_type': 'BALL', 'complex_subtype': 'Rips'},
-#             'results': {'execution_time': 123.45},
+#             'dataset': {'data_type': 'example_data', 'points': [[0, 0], [0, 1]]},
+#             "parameters": {"expansion_dim": 2, "collapse_edges": True,
+#                             "complex_type": "BALL", "complex_subtype": "RIPS",
+#                             "save_simplex_tree": False},
+#             'results': {"barcode": [], "simplex_tree": gd.SimplexTree(), 'execution_time': 123.45}, # gd.SimplexTree() should just create an empty object
 #         }
-#         print(f"json.dumps call arguments: {mock_json_dumps.call_args}")
 #         mock_json_dumps.assert_called_once_with(expected_data, cls=CustomEncoder, indent=4)
-
-
-
-import pytest
-from datetime import datetime
-from unittest.mock import patch, MagicMock
-import numpy as np
-from ellipsoids.common import Experiment, Dataset, Parameters, Results, ComplexType, ComplexSubtype
-from ellipsoids.data_handling import CustomEncoder
-import json
-
-@pytest.fixture
-def mock_current_time():
-    with patch('ellipsoids.common.datetime') as mock_datetime:
-        mock_datetime.now.return_value = datetime(2025, 2, 25, 12, 0, 0)
-        yield mock_datetime
-
-# Integration test function for save_to_json
-def test_save_to_json_integration(mock_current_time):
-    dataset = Dataset(data_type="example_data", points=np.array([[0, 0], [0, 1]]))
-    parameters = Parameters(complex_type=ComplexType.BALL, complex_subtype=ComplexSubtype.RIPS)
-    results = Results()
-    results.execution_time = 123.45
-    experiment = Experiment(dataset, parameters)
-    experiment.results = results
-
-    with patch("builtins.open", new_callable=MagicMock) as mock_open, patch("json.dumps") as mock_json_dumps:
-        # Define the expected filename and mock return value for json.dumps
-        expected_filepath = 'data/example_data-2_BALL-Rips__20250225_120000.json'
-        # Call the save_to_json method (this is where we want to test the real behavior)
-        experiment.save_to_json()
-
-        # Assert that the correct file was created
-        mock_open.assert_called_once_with(expected_filepath, 'w')
-
-        # Assert that json.dumps was called with the correct data
-        expected_data = {
-            'dataset': {'data_type': 'example_data', 'points': [[0, 0], [0, 1]]},
-            "parameters": {"expansion_dim": 2, "collapse_edges": True,
-                            "complex_type": "BALL", "complex_subtype": "RIPS",
-                            "save_simplex_tree": False},
-            'results': {"barcode": [], "simplex_tree": gd.SimplexTree(), 'execution_time': 123.45}, # gd.SimplexTree() should just create an empty object
-        }
-        mock_json_dumps.assert_called_once_with(expected_data, cls=CustomEncoder, indent=4)

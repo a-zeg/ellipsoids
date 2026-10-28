@@ -32,7 +32,7 @@ from ellipsoids.common import ConversionType
 from ellipsoids.common import convert
 
 
-def plot_ellipse(ellipse: Ellipsoid, color='grey', r:float=1, axes=None, r_spherisize:float=np.inf):
+def plot_ellipse(ellipse: Ellipsoid, color='grey', r:float=1, axes=None, r_spherisize:float=np.inf, linewidth=1):
     sampleRate = 100
     t = np.linspace(0, 2*np.pi, sampleRate)
     spherisized_axes = spherisize_axes(ellipse.axes_lengths, r=r, r_spherisize=r_spherisize)
@@ -42,7 +42,7 @@ def plot_ellipse(ellipse: Ellipsoid, color='grey', r:float=1, axes=None, r_spher
     y = ellipse.center[1] + ellipse.axes[0,1]*xTemp + ellipse.axes[1,1]*yTemp
 
     plot_context = axes if axes is not None else plt
-    plot_context.plot(x,y,c=color, alpha=0.5)
+    plot_context.plot(x,y,c=color, alpha=0.5, linewidth=linewidth)
 
 
 
@@ -76,9 +76,9 @@ def plot_ellipsoid(ellipsoid: Ellipsoid, color='grey', r:float=1, axes=None):
 
 
 
-def plot_ellipses(ellipse_list: list[Ellipsoid], r: float, axes=None, r_spherisize:float=np.inf):
+def plot_ellipses(ellipse_list: list[Ellipsoid], r: float, axes=None, r_spherisize:float=np.inf, linewidth=1, color='grey'):
     for ellipse in ellipse_list:
-        plot_ellipse(ellipse, r=r, axes=axes, r_spherisize=r_spherisize)
+        plot_ellipse(ellipse, r=r, axes=axes, r_spherisize=r_spherisize, linewidth=linewidth, color=color)
 
 
 
@@ -88,20 +88,20 @@ def plot_ellipsoids(ellipsoid_list, r, axes=None):
 
 
 
-def plot_circle(point, r=1, color='grey', axes=None):
+def plot_circle(point: np.ndarray, r: float = 1, color='grey', axes=None, linewidth=1):
     sample_rate = 100
     t = np.linspace(0, 2*np.pi, sample_rate)
     x = point[0] + r*np.cos(t)
     y = point[1] + r*np.sin(t)
 
     plot_context = axes if axes is not None else plt
-    plot_context.plot(x,y,c=color, alpha=0.5)
+    plot_context.plot(x,y,c=color, alpha=0.5, linewidth=linewidth)
 
 
 
-def plot_circles(points, r=1, axes=None):
+def plot_circles(points: np.ndarray, r: float = 1.0, axes=None, linewidth = 1):
     for point in points:
-        plot_circle(point, r=r, axes=axes)
+        plot_circle(point, r=r, axes=axes, linewidth=linewidth)
 
 
 
@@ -109,8 +109,10 @@ def plot_simplex_tree(
         points: np.ndarray,
         simplexTree: gd.SimplexTree,
         filtration: float,
-        axes: plt.Axes,
-        simplex_color='r'
+        axes: Optional[plt.Axes] = None,
+        simplex_color='r',
+        linewidth=0.5,
+        pt_size=5,
         ):
     dim = len(points[0])
     if dim > 3:
@@ -125,25 +127,42 @@ def plot_simplex_tree(
         coordinates = np.transpose(points[simplex])
         match len(simplex):
             case 1:
-                plot_context.scatter(*coordinates, c='k', zorder=100)
+                plot_context.scatter(*coordinates, c='k', zorder=100, s=pt_size)
             case 2:
-                plot_context.plot(*coordinates, c=simplex_color)
+                plot_context.plot(*coordinates, c=simplex_color, linewidth=linewidth)
             case 3:
                 if dim == 2:
                     plot_context.fill(*coordinates, c=simplex_color, alpha=0.1)
 
 
 
-def plot_data_points(points, axes=None):
-    plot_context = axes if axes is not None else plt
+def plot_data_points(points, axes=None, pt_size=1, color='k'):
+
+    if axes is None:
+        if len(points[0]) == 2:
+            _, axes = plt.subplots()
+        elif len(points[0]) == 3:
+            fig = plt.figure()
+            axes = fig.add_subplot(111, projection='3d')
+
     if len(points[0]) == 2:
-        plot_context.scatter(points[:,0],points[:,1])
+        axes.scatter(
+            points[:, 0],
+            points[:, 1],
+            s=pt_size,
+            color=color
+        )
+
     elif len(points[0]) == 3:
-        plot_context.scatter(points[:,0],points[:,1],points[:,2])
-        # plot_context.remove()
-        # TODO figure this out!
+        axes.scatter(
+            points[:, 0],
+            points[:, 1],
+            points[:, 2],
+            s=pt_size,
+            color=color
+        )
 
-
+    return axes
 
 
 # from typing import List, Dict, Any
@@ -189,7 +208,7 @@ def plot_barcode(
     fontsize=16,
     axis_start=None,
     infinity=None,
-    bar_height=0.8,
+    bar_height=0.5, #0.8
 ):
     '''
     Adapted from GUDHI's plot_persistence_barcode.
@@ -239,22 +258,22 @@ def plot_barcode(
         axes.set_xlim((axis_start, infinity))
 
     # -------------------------------- 
-    # the next part fixes the scaling 
-    margin = 0.4
-    n_bars = len(barcode)
-    padding = 1.5
+    # # the next part fixes the scaling
+    # margin = 0.4
+    # n_bars = len(barcode)
+    # padding = 1.5
 
-    fig = axes.get_figure()
-    axes.set_ylim([-padding, (n_bars-1) + padding])
-    fig_height = n_bars * (bar_height + margin)# + padding
-    axes.invert_yaxis() # temp changing this
-    
-    fig.set_figheight(fig_height)
+    # fig = axes.get_figure()
+    # axes.set_ylim([-padding, (n_bars-1) + padding])
+    # fig_height = n_bars * (bar_height + margin)# + padding
+    # axes.invert_yaxis() # temp changing this
 
-    width_inches = 10
-    height_inches = n_bars * margin + padding
-    fig.set_size_inches(width_inches, height_inches)
-    fig.subplots_adjust(top=1)
+    # fig.set_figheight(fig_height)
+
+    # width_inches = 10
+    # height_inches = n_bars * margin + padding
+    # fig.set_size_inches(width_inches, height_inches)
+    # fig.subplots_adjust(top=1)
     # --------------------------------          
 
     return axes
@@ -363,13 +382,14 @@ def plot_spatial_data(experiment, ax_plot):
         plot_data_points(dataset.points, axes=ax_plot)
     if plot_parameters.draw_ellipsoids:
 
-        filtration = plot_parameters.filtration
-        if parameters.complex_subtype == ComplexSubtype.RIPS:
-            radius = convert(filtration, ConversionType.RIPS_TO_RADIUS)
-        elif parameters.complex_subtype == ComplexSubtype.ALPHA:
-            radius = convert(filtration, ConversionType.ALPHA_TO_RADIUS)
-        else:
-            radius = filtration
+        # filtration = plot_parameters.filtration
+        # if parameters.complex_subtype == ComplexSubtype.RIPS:
+        #     radius = convert(filtration, ConversionType.NONE)
+        # elif parameters.complex_subtype == ComplexSubtype.ALPHA:
+        #     radius = convert(filtration, ConversionType.NONE)
+        # else:
+        #     radius = filtration
+        radius = plot_parameters.filtration
 
         if isinstance(results, EllipsoidResults):
             plot_ellipses(results.ellipsoid_list,
@@ -383,7 +403,8 @@ def plot_spatial_data(experiment, ax_plot):
 
     if parameters.complex_type == ComplexType.ELLIPSOID \
        and parameters.complex_subtype == ComplexSubtype.ALPHA:
-        plot_delaunay_triangulation(dataset.points, ax_plot)
+        if plot_parameters.draw_triangulation:
+            plot_delaunay_triangulation(dataset.points, ax_plot)
 
 
 

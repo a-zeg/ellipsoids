@@ -1,2 +1,9 @@
 *
 !.gitignore
+
+!benchmarking/
+!benchmarking/**
+
+!turkevs/
+!turkevs/turkevs_ns=27_nsv=5_np=600_s=0/
+!turkevs/turkevs_ns=27_nsv=5_np=600_s=0/**

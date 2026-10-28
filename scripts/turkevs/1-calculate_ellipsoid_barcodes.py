@@ -27,27 +27,15 @@ logger = logging.getLogger(__name__)
 
 def main():
 
-    setup_path = "data/turkevs/turkevs_npc=100_np=20_s=0"
+    setup_path = "data/turkevs/turkevs_ns=27_nsv=5_np=600_s=0"
     check_if_already_calculated = True
     buffer_size = 10
 
     complexes_to_calculate = [
-        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=7, axes_ratios=np.asarray([2,1])),
-        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=9, axes_ratios=np.asarray([2,1])),
-        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=7, axes_ratios=np.asarray([2,1]), r_spherisize=0.5),
-        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=9, axes_ratios=np.asarray([2,1]), r_spherisize=0.5),
-        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=7, axes_ratios=None),
-        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=9, axes_ratios=None),
-        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=5, axes_ratios=np.asarray([2,1]), r_spherisize=1),
+        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=20, axes_ratios=np.asarray([2.5,1])),
+        EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=20, axes_ratios=None),
         Parameters(complex_subtype=ComplexSubtype.RIPS),
-        Parameters(complex_subtype=ComplexSubtype.ALPHA),
-        ]
-    # nbhd_sizes = [5,12,15,18,20,25,30,40,50,75,100]
-    # complexes_to_calculate = []
-    # for nbhd_size in nbhd_sizes:
-    #     complexes_to_calculate.append(
-    #         EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS, nbhd_size=nbhd_size, axes_ratios=None),
-    #     )
+    ]
 
     args = parse_args()
     setup_path = args.folder or setup_path

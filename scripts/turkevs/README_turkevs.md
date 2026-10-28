@@ -8,18 +8,18 @@ These scripts make heavy use of the code published [here](https://github.com/ren
 
 The following scripts are available. If you're running these experiments from scratch, the number in the filename indicates the order in which the scripts should be executed.
 
+The parameters (point cloud sizes, etc) currently in those files have been used for the result in the paper.
+
 Core:
-- `0-generate_turkevs_datasets.py` generates datasets according to the specified number of point clouds, number of points and the seed and saves them in a `.json` file.
+- `0-generate_point_clouds.py` generates datasets according to the specified number of point clouds, number of points and the seed and saves them in a `.json` file.
 - `1-calculate_ellipsoid_barcodes.py` calculates barcodes corresponding to the ellipsoid complexes with the specified parameters and saves them to a `.jsonl.gz` file. Each line of this file corresponds to a single experiment summary and, depending on the number of point clouds and parameters, there might be thousands of lines.
 - `2-run_classification.py` reads in the `.jsonl.gz` containing the barcodes and runs (multiple) classification using those, as well as the barcodes and other signatures used in [[1]](#1).
 - `3-aggregate_classification_results.py` calculates the mean classification accuracy per parameter set and creates plots.
 
 Optional:
-- `1.5-merge_results.py` merges summaries corresponding to different dataset chunks into a single summaries file. This is useful after running parallel jobs on a cluster.
+- `compare_dataset_pairs.py` is for comparing pairs of datasets, both the point clouds and the metadata
+- `compare_pointcloud_browser.py` is for visual inspection of either a single dataset, or a side-by-side comparison of dataset pairs
 - `4-compare_aggreated_results.py` is for checking which parameters lead to the best classification performance across all datasets. 
-- `submit_euler_jobs.py` for submitting SLURM jobs on the ETH HPC.
-- `submit_euler_jobs_by_dataset_chunks.py`for submitting SLURM jobs on the ETH HPC.
-
 
 # References
 

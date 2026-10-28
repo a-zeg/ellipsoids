@@ -8,8 +8,20 @@ REL_CLASSIFICATION_RESULTS_DIR = "classification_results"
 REL_AGGREGATED_RESULTS_DIR = "aggregated_results"
 
 # name templating
-def get_setup_name(n_point_clouds: int, n_points: int, seed: int):
-    return f"turkevs_npc={n_point_clouds}_np={n_points}_s={seed}"
+# def get_setup_name(n_point_clouds: int, n_points: int, seed: int):
+#     return f"turkevs_npc={n_point_clouds}_np={n_points}_s={seed}"
+def get_setup_name(
+    n_shapes: int,
+    n_shape_variations: int,
+    n_points: int,
+    seed: int,
+):
+    return (
+        f"turkevs_ns={n_shapes}"
+        f"_nsv={n_shape_variations}"
+        f"_np={n_points}"
+        f"_s={seed}"
+    )
 
 
 def resolve_setup_path(setup_input: str):

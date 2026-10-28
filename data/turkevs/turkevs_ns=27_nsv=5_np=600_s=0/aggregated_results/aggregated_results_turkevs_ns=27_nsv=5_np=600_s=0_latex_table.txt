@@ -1,0 +1,7 @@
+\begin{tabular}{|l|l|l|c|c|}
+\hline
+\textbf{Results label} & \textbf{Complex type} & \textbf{Subtype} & \textbf{Neighbourhood size} & \textbf{Axes ratios} \\
+\hline
+PHE [1] & ELLIPSOID & Rips & 20 & [2.5 1. ] \\ \hline
+PHE [2] & ELLIPSOID & Rips & 20 & PCA \\ \hline
+\end{tabular}

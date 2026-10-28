@@ -17,11 +17,18 @@ from ellipsoids.visualisation import plot_experiments
 if __name__ == '__main__':
     dataset = Dataset(sample_from_figure_eight(30, a=1, b=0.3), "figure_eight")
 
-    all_parameters = [EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS,
-                                          axes_ratios=np.array([10,1])),
-                      EllipsoidParameters(complex_subtype=ComplexSubtype.RIPS,
-                                          axes_ratios=np.array([10,1]),
-                                          r_spherisize=4)]
+    all_parameters = [
+        EllipsoidParameters(
+            complex_subtype=ComplexSubtype.RIPS,
+            nbhd_size=3,
+            axes_ratios=np.array([10,1])
+        ),
+        EllipsoidParameters(
+            complex_subtype=ComplexSubtype.RIPS,
+            nbhd_size=3,
+            axes_ratios=np.array([10,1]),
+            r_spherisize=4),
+    ]
 
     all_experiments = []
     for parameters in all_parameters:
@@ -33,7 +40,7 @@ if __name__ == '__main__':
         experiment.plot_parameters.draw_points = True
         experiment.plot_parameters.draw_ellipsoids = True
         experiment.plot_parameters.draw_simplex_tree = True
-        experiment.plot_parameters.filtration = 1.5
+        experiment.plot_parameters.filtration = 0.2
 
         all_experiments.append(experiment)
 

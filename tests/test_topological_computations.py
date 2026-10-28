@@ -4,7 +4,7 @@ import copy
 
 from scipy.spatial import Delaunay, Voronoi
 
-from ellipsoids.topological_computations import fit_ellipsoid, spherisize_axes
+from ellipsoids.topological_computations import build_ellipsoids, fit_ellipsoid, pca_axes_and_lengths, spherisize_axes
 from ellipsoids.topological_computations import generate_ELLIPSOID_RIPS_simplex_tree
 from ellipsoids.topological_computations import Ellipsoid
 from ellipsoids.topological_computations import find_intersection_radius
@@ -12,7 +12,7 @@ from ellipsoids.topological_computations import get_max_axes_ratio
 from ellipsoids.topological_computations import ellipsoid_intersection
 # from ellipsoids.topological_computations import reduce_barcode
 from ellipsoids.topological_computations import pad_axes_ratios
-from ellipsoids.common import spherisize
+from ellipsoids.common import AxesMode, EllipsoidBuildSpec, LengthsMode, spherisize
 from ellipsoids.common import scale_to_01
 from ellipsoids.data_handling import print_list_of_simplices
 from ellipsoids.topological_computations import adjacent_delaunay_vertices
@@ -20,13 +20,13 @@ from ellipsoids.topological_computations import adjacent_delaunay_vertices
 
 def test_fit_ellipsoid():
 
-    center = [0,0]
+    center = np.asarray([0,0])
     neighbourhood = np.array([[-1,0],[0,0],[1,0]])
     axes_ratios = np.array([2,1])
 
     fitted_ellipsoid = fit_ellipsoid(center, neighbourhood, axes_ratios = axes_ratios)
 
-    assert fitted_ellipsoid.center == center
+    assert np.allclose(fitted_ellipsoid.center, center)
     assert np.allclose(fitted_ellipsoid.axes[0], np.array([1,0]))
     assert np.allclose(fitted_ellipsoid.axes[1], np.array([0,1]))
     assert np.allclose(fitted_ellipsoid.axes_lengths, [1, 0.5])
@@ -64,12 +64,11 @@ def test_find_intersection_radius():
 
     center1 = np.asarray([0,0])
     axes1 = np.asarray([[1,0],[0,1]])
-    axesLengths1 = np.asarray([2,1])
+    axesLengths1 = np.asarray([1,0.5])
 
     center2 = np.asarray([1,0])
     axes2 = np.asarray([[1,0],[0,1]])
-    axesLengths2 = np.asarray([2,1])
-
+    axesLengths2 = np.asarray([1,0.5])
 
     ellipsoid1 = Ellipsoid(center1, axes1, axesLengths1)
     ellipsoid2 = Ellipsoid(center2, axes2, axesLengths2)
@@ -79,6 +78,7 @@ def test_find_intersection_radius():
 
     assert np.isclose(intersection_radius, target_intersection_radius, atol=0.01)
 
+    
 
 def test_get_max_axes_ratio():
 
@@ -108,9 +108,9 @@ def _simplex_tree_to_list(simplex_tree: gd.SimplexTree):
     return simplex_list
 
 
+
 def _simplex_trees_equal(st1: gd.SimplexTree, st2: gd.SimplexTree, atol=0.01):
     ''' Compares if two simplex trees are equal.
-    i
     The reason a simple list comparison doesn't work is because
     the filtrations might differ slightly due to numerical errors.
     
@@ -146,6 +146,7 @@ def _simplex_trees_equal(st1: gd.SimplexTree, st2: gd.SimplexTree, atol=0.01):
     return False
 
 
+
 def test_simplex_trees_equal():
     
     st1a = gd.SimplexTree()
@@ -166,13 +167,17 @@ def test_simplex_trees_equal():
 
     assert _simplex_trees_equal(st2a, st2b)
 
+    
 
 def test_generate_ellipsoid_simplex_tree4():
 
     points = np.array([[-1,0], [0,0], [1,0]])
     nbhd_size = 3
-    axes_ratios = np.array([2,1])
+    axes = np.asarray([[1,0],[0,1]])
+    axes_lengths = np.asarray([1,0.5])
+    ellipsoid_list = [Ellipsoid(point, axes, axes_lengths) for point in points]
 
+    simplex_tree_target = gd.SimplexTree()
     simplex_list = [
         ( [0], 0.0 ),
         ( [1], 0.0 ),
@@ -181,17 +186,17 @@ def test_generate_ellipsoid_simplex_tree4():
         ( [1,2], 0.9985820312499998 ),
         ( [0,2], 1.9995585937499998 )
     ]
-
-    simplex_tree_target = gd.SimplexTree()
     for splx in simplex_list:
         simplex_tree_target.insert(splx[0], filtration=splx[1])
 
-    simplex_tree = generate_ELLIPSOID_RIPS_simplex_tree(points, nbhd_size, axes_ratios)
-    # printListOfSimplices(simplex_tree_target)
-    # printListOfSimplices(simplex_tree[0])
+    simplex_tree, _ = generate_ELLIPSOID_RIPS_simplex_tree(ellipsoid_list, radius_conversion_fn=lambda f: f*2)
 
-    assert _simplex_trees_equal(simplex_tree[0], simplex_tree_target)
+    print("actual:", _simplex_tree_to_list(simplex_tree))
+    print("target:", _simplex_tree_to_list(simplex_tree_target))
 
+    assert _simplex_trees_equal(simplex_tree, simplex_tree_target)
+
+    simplex_tree_target_approx = gd.SimplexTree()
     simplex_list_approx = [
         ( [0], 0.0 ),
         ( [1], 0.0 ),
@@ -200,38 +205,29 @@ def test_generate_ellipsoid_simplex_tree4():
         ( [1,2], 1 ),
         ( [0,2], 2 )
     ]
-
-    simplex_tree_target_approx = gd.SimplexTree()
     for splx in simplex_list_approx:
         simplex_tree_target_approx.insert(splx[0], filtration=splx[1])
 
-    assert _simplex_trees_equal(simplex_tree[0], simplex_tree_target_approx)
+    print("actual:", _simplex_tree_to_list(simplex_tree))
+    print("target:", _simplex_tree_to_list(simplex_tree_target))
+
+    assert _simplex_trees_equal(simplex_tree, simplex_tree_target_approx)
 
 
-# def test_reduce_barcode():
 
-#     barcode = [
-#         [0, [0,1]],
-#         [0, [-0.5, 1]],
-#         [1, [-0.3, 0.3]],
-#         [42, [-10, 353]]
-#     ]
+def test_pca_axes_and_lengths():
+    points = np.asarray([ [0,0], [1,0], [-1,0] ])
+    nbhd_size = 3
 
-#     target_barcode = [
-#         [0, [0,1]],
-#         [0, [-0.5, 1]]
-#     ]
+    axes, lengths = pca_axes_and_lengths(points, nbhd_size)
 
-#     reduced_barcode, _ = reduce_barcode(barcode, nBarsDim0=2, nBarsDim1=0, nBarsDim2=0)
-#     assert target_barcode == reduced_barcode
+    axes_target = np.tile([[1,0],[0,1]], (3,1,1))
+    lengths_target = np.tile([1,0], (3,1))
+
+    assert np.allclose(axes_target, axes)
+    assert np.allclose(np.sqrt(2)*lengths_target, lengths)
 
 
-#     target_barcode = [
-#         [0, [0,1]]
-#     ]
-
-#     reduced_barcode, _ = reduce_barcode(barcode, nBarsDim0=1, nBarsDim1=0, nBarsDim2=0)
-#     assert target_barcode == reduced_barcode
 
 
 def test_max_filtration():
@@ -336,3 +332,6 @@ def test_adjacent_delaunay_vertices():
     delaunay = Delaunay(points)
     adjacent_vertices = adjacent_delaunay_vertices(delaunay, vertex_index)
     assert adjacent_vertices == [1,3,4]
+
+
+

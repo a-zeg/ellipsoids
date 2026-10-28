@@ -5,9 +5,12 @@ class MainOnlyInfoFilter(logging.Filter):
     def filter(self, record):
         return not (record.levelno == logging.INFO and record.name != "__main__")
 
-def setup_logging(level=logging.INFO):
+def setup_logging(level=logging.INFO, filter_main = True):
+    # level possibilities:
+    # NOTSET, DEBUG, INFO, WARN, ERROR, and CRITICAL.
     handler = logging.StreamHandler(sys.stdout)
-    handler.addFilter(MainOnlyInfoFilter())
+    if filter_main:
+        handler.addFilter(MainOnlyInfoFilter())
     formatter = logging.Formatter("[%(levelname)s] %(name)s: %(message)s")
     handler.setFormatter(formatter)
 

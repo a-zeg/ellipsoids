@@ -115,6 +115,93 @@ class Ellipsoid:
 
 
 
+# building ellipsoids
+
+class AxesMode(str, Enum):
+    PCA = "pca"
+    GIVEN = "given"
+
+
+class LengthsMode(str, Enum):
+    PCA_SINGULAR_RATIO = "pca_singular_ratio"
+    RATIO = "ratio"
+    GIVEN = "given"
+
+
+class LengthsNormalization(str, Enum):
+    NONE = "none"
+    MAX_TO_1 = "max_to_1" 
+
+
+
+    
+
+@dataclass(frozen=True)
+class EllipsoidBuildSpec:
+    axes_mode: AxesMode
+    lengths_mode: LengthsMode
+    lengths_normalization: LengthsNormalization = LengthsNormalization.MAX_TO_1
+
+    nbhd_size: Optional[int] = None
+    axes_ratios: Optional[np.ndarray] = None
+    axes: Optional[np.ndarray] = None
+    axes_lengths: Optional[np.ndarray] = None
+    min_axes_length: float = 1e-4
+
+    def validate(self, *, n_points: int, dim: int) -> None:
+        
+        # axes
+        
+        if self.axes_mode == AxesMode.PCA:
+            if self.nbhd_size is None or self.nbhd_size < 2:
+                raise ValueError("axes_mode='pca' requires nbhd_size >= 2.")
+            if self.axes is not None:
+                raise ValueError("Do not provide axes when axes_mode='pca'.")
+            if n_points < self.nbhd_size:
+                raise ValueError(f"The neighbourhood size {self.nbhd_size=} \
+                is larger than the total number of points {n_points}.")
+
+        elif self.axes_mode == AxesMode.GIVEN:
+            if self.axes is None:
+                raise ValueError("axes_mode='given' requires axes (shape (N,d,d)).")
+            if self.axes.shape != (n_points, dim, dim):
+                raise ValueError(f"axes must have shape (N,d,d)=({n_points},{dim},{dim}).")
+
+        else:
+            raise ValueError(f"Unknown axes_mode: {self.axes_mode}")
+
+        # lengths
+
+        if self.lengths_mode == LengthsMode.PCA_SINGULAR_RATIO:
+            if self.axes_mode != AxesMode.PCA:
+                raise ValueError("lengths_mode='pca_singular_ratio' requires axes_mode='pca'.")
+            if self.axes_ratios is not None or self.axes_lengths is not None:
+                raise ValueError("Do not provide axes_ratios/axes_lengths with 'pca_singular_ratio'.")
+
+        elif self.lengths_mode == LengthsMode.RATIO:
+            if self.axes_ratios is None:
+                raise ValueError("lengths_mode='ratio' requires axes_ratios.")
+            r = np.asarray(self.axes_ratios, dtype=float)
+            if r.shape != (dim,):
+                raise ValueError(f"axes_ratios must have shape ({dim},).")
+            if np.any(r <= 0):
+                raise ValueError("axes_ratios must be strictly positive (no zeros/negatives).")
+
+        elif self.lengths_mode == LengthsMode.GIVEN:
+            if self.axes_lengths is None:
+                raise ValueError("lengths_mode='given' requires axes_lengths (shape (N,d)).")
+            if self.axes_lengths.shape != (n_points, dim):
+                raise ValueError(f"axes_lengths must have shape (N,d)=({n_points},{dim}).")
+            if np.any(np.asarray(self.axes_lengths) <= 0):
+                raise ValueError("axes_lengths must be strictly positive.")
+
+        else:
+            raise ValueError(f"Unknown lengths_mode: {self.lengths_mode}")
+
+        
+
+    
+
 class TurkevsTransformation(Enum):
     STANDARD = ("std", "standard")
     TRANSLATION = ("trns", "translation")
@@ -145,7 +232,14 @@ class TurkevsDatasetInfo:
     point_cloud_index: int
     transformation: TurkevsTransformation
     label: str                             # label for classification
-    n_point_clouds: int
+
+    shape_group: str | None = None
+    shape_name: str | None = None
+    shape_variation_index: int | None = None
+
+    n_point_clouds: int | None = None
+    n_shapes: int | None = None
+    n_shape_variations: int | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -154,7 +248,12 @@ class TurkevsDatasetInfo:
             "point_cloud_index": self.point_cloud_index,
             "transformation": self.transformation.shortname,
             "label": self.label,
-            "n_point_clouds": self.n_point_clouds
+            "n_point_clouds": self.n_point_clouds,
+            "shape_group": self.shape_group,
+            "shape_name": self.shape_name,
+            "shape_variation_index": self.shape_variation_index,
+            "n_shapes": self.n_shapes,
+            "n_shape_variations": self.n_shape_variations
         }
 
     @classmethod
@@ -165,11 +264,48 @@ class TurkevsDatasetInfo:
             point_cloud_index = data["point_cloud_index"],
             transformation = TurkevsTransformation.from_shortname(data["transformation"]),
             label = data["label"],
-            n_point_clouds = data["n_point_clouds"]
+            shape_group=data.get("shape_group"),
+            shape_name=data.get("shape_name"),
+            shape_variation_index=data.get("shape_variation_index"),
+            n_shapes=data.get("n_shapes"),
+            n_shape_variations=data.get("n_shape_variations"),
+            n_point_clouds=data.get("n_point_clouds"),
         )
 
     def to_str(self) -> str:
         return f"turkevs_id={self.dataset_id}_point_cloud_index={self.point_cloud_index}_trnsf={self.transformation.shortname}"
+
+
+
+@dataclass
+class FigureEightDatasetInfo:
+    dataset_id: Optional[str]
+    seed: int
+    point_cloud_index: int
+    label: str
+    n_point_clouds: int
+    figure_eight_parameters: tuple
+
+    def to_dict(self) -> dict:
+        return {
+            "dataset_id": self.dataset_id,
+            "seed": self.seed,
+            "point_cloud_index": self.point_cloud_index,
+            "label": self.label,
+            "n_point_clouds": self.n_point_clouds,
+            "figure_eight_parameters": self.figure_eight_parameters
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "FigureEightDatasetInfo":
+        return cls (
+            dataset_id = data["dataset_id"],
+            seed = data["seed"],
+            point_cloud_index = data["point_cloud_index"],
+            label = data["label"],
+            n_point_clouds = data["n_point_clouds"],
+            figure_eight_parameters = data["figure_eight_parameters"]
+        )
 
 
 
@@ -203,7 +339,15 @@ class Dataset:
         additional_info = None
         if "additional_info" in data and data_type=="turkevs":
             additional_info = TurkevsDatasetInfo.from_dict(data["additional_info"])
+        if "additional_info" in data and data_type=="figure_eight":
+            additional_info = FigureEightDatasetInfo.from_dict(data["additional_info"])
         return cls(points=points, data_type=data_type, additional_info=additional_info)
+
+    def calculate_points_hash(self, hash_length: int = 6):
+        hasher = hashlib.sha256()
+        hasher.update(self.points.astype(np.float32).tobytes())
+        full_hash = hasher.hexdigest()
+        return full_hash[:hash_length]
 
 
 
@@ -224,8 +368,11 @@ class DatasetSummary:
     def from_dict(cls, data):
         data_type = data["data_type"]
         n_points = data.get("n_points", None)
-        additional_info = TurkevsDatasetInfo.from_dict(data["additional_info"]) \
-            if data.get("additional_info") and data_type=="turkevs" else None
+        additional_info = None
+        if "additional_info" in data and data_type=="turkevs":
+            additional_info = TurkevsDatasetInfo.from_dict(data["additional_info"])
+        if "additional_info" in data and data_type=="figure_eight":
+            additional_info = FigureEightDatasetInfo.from_dict(data["additional_info"])
         return cls(data_type=data_type, n_points = n_points, additional_info=additional_info)
 
 
@@ -291,6 +438,9 @@ class Parameters:
     def __hash__(self):
         return hash(frozenset(self.to_dict().items()))
 
+    def to_str(self):
+        return f"{self.complex_type}_{self.complex_subtype}"
+
 
 
 @dataclass
@@ -298,11 +448,17 @@ class EllipsoidParameters(Parameters):
     # WARNING: the first ComplexType in the next line is not just a type hint.
     # Without it, the default value won't be set correctly.
     complex_type: ComplexType = ComplexType.ELLIPSOID
-    nbhd_size: int = 3
-    axes_ratios: Optional[np.ndarray] = None
+    axes: Optional[np.ndarray] = None
+    axes_lengths: Optional[np.ndarray] = None
     r_spherisize: float = np.inf
+    
+    nbhd_size: Optional[int] = None
+    axes_ratios: Optional[np.ndarray] = None
     save_ellipsoid_list: bool = False
     use_cache: bool = True
+
+    # if axes is None and nbhd_size is None:
+    #     nbhd_size = 3
 
     @property
     def use_pca_axes(self) -> bool:
@@ -324,6 +480,7 @@ class EllipsoidParameters(Parameters):
         data.update({
             "nbhd_size": self.nbhd_size,
             "axes_ratios": tuple(self.axes_ratios) if self.axes_ratios is not None else None,
+            "axes": self.axes,
             "r_spherisize": self.r_spherisize,
             "save_ellipsoid_list": self.save_ellipsoid_list,
             "use_cache": self.use_cache
@@ -336,10 +493,12 @@ class EllipsoidParameters(Parameters):
         parent_data = {key: data[key] for key in Parameters.__annotations__ if key in data}
         parameters = Parameters.from_dict(parent_data)
         axes_ratios = restore_numpy_array(data.get("axes_ratios", None))  # Default to None if missing
+        axes = restore_numpy_array(data.get("axes", None))
         return cls(
             **parameters.__dict__,
             nbhd_size=data["nbhd_size"],
             axes_ratios=axes_ratios,
+            axes=axes,
             r_spherisize=data["r_spherisize"],
             save_ellipsoid_list=data["save_ellipsoid_list"],
             use_cache=data.get("use_cache", None),
@@ -352,6 +511,9 @@ class EllipsoidParameters(Parameters):
 
     def __hash__(self):
         return hash(frozenset(self.to_dict().items()))
+
+    def to_str(self):
+        return f"{super().to_str()}_nbhd_size={self.nbhd_size}_axes_ratios={self.axes_ratios_to_str()}_rs={self.r_spherisize}"
 
 
 
@@ -377,6 +539,13 @@ class Results:
             execution_time = data.get("execution_time"),
             )
 
+    # @staticmethod
+    # def from_any_dict(data: dict) -> "Results":
+    #     complex_type = data.get("complex_type")
+    #     if complex_type == ComplexType.ELLIPSOID.value:
+    #         return EllipsoidResults.from_dict(data)
+    #     return Results.from_dict(data)
+
 
 
 @dataclass
@@ -390,8 +559,13 @@ class EllipsoidResults(Results):
 
     @classmethod
     def from_dict(cls, data: dict) -> "EllipsoidResults":
-        results = super().from_dict(data)
-        ellipsoid_list = data.get("ellipsoid_list", [])
+        # results = super().from_dict(data)
+        results = Results.from_dict(data)
+        ellipsoid_list_dict = data.get("ellipsoid_list", [])
+        ellipsoid_list = []
+        for ellipsoid in ellipsoid_list_dict:
+            ellipsoid_list.append(Ellipsoid.from_dict(ellipsoid))
+            
 
         return cls(
             **results.__dict__,
@@ -405,6 +579,7 @@ class PlotParameters:
     draw_points: bool = False
     draw_ellipsoids: bool = False
     draw_simplex_tree: bool = False
+    draw_triangulation: bool = False
     filtration: float = 1
     n_bars: dict = field(default_factory=lambda: {0:5, 1:10, 2:10}) # number of bars in the reduced barcode
     x_axis_start: float = -0.05
@@ -467,6 +642,14 @@ class ExperimentSummary:
                 f"_r_s={self.parameters.r_spherisize}"
         return filename
 
+
+
+'''
+run experiment:
+- calculate axes from axes ratios (should be done as early as possible i guess)
+- get the intersections etc
+
+'''
 
 
 class Experiment:
@@ -568,7 +751,12 @@ class Experiment:
     def from_dict(cls, data: dict) -> "Experiment":
         dataset = Dataset.from_dict(data["dataset"])
         parameters = Parameters.from_any_dict(data["parameters"])
-        results = Results.from_dict(data["results"])
+        if parameters.complex_type == ComplexType.ELLIPSOID:
+            results = EllipsoidResults.from_dict(data["results"])
+        else:
+            results = Results.from_dict(data["results"])
+        # # results = Results.from_dict(data["results"])
+        # results = Results.from_any_dict(data["results"])
 
         experiment = cls(dataset, parameters)
         experiment.results = results
@@ -582,6 +770,7 @@ class ConversionType(Enum):
     RIPS_TO_RADIUS = "RIPS_filtration_to_radius"
     RADIUS_TO_ALPHA = "radius_to_ALPHA_filtration"
     ALPHA_TO_RADIUS = "ALPHA_filtration_to_radius"
+    NONE = "none"
 
 
 
@@ -590,7 +779,8 @@ def convert(value: float, conversion_type: ConversionType):
         ConversionType.RADIUS_TO_RIPS: lambda r: 2*r,
         ConversionType.RIPS_TO_RADIUS: lambda f: f/2,
         ConversionType.RADIUS_TO_ALPHA: lambda r: r**2,
-        ConversionType.ALPHA_TO_RADIUS: lambda f: np.sqrt(f)
+        ConversionType.ALPHA_TO_RADIUS: lambda f: np.sqrt(f),
+        ConversionType.NONE: lambda s: s,
     }
     convert_func = conversions.get(conversion_type)
     if convert_func:

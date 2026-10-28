@@ -147,8 +147,6 @@ To run the classification experiments described in [[3]](#3), follow the instruc
 - clean up unused code;
 - update tests.
 
-If you spot any blunders or if you're trying to use the code and you can't find your way around, please contact me: ana [dot] zegarac [at] math [dot] ethz [dot] ch.
-
 
 
 # Acknowledgements
@@ -156,7 +154,6 @@ If you spot any blunders or if you're trying to use the code and you can't find 
 The last co-author of the paper [[1]](#1) would like to thank:
 - Marco Gähler for running the Code Review Days at ETH Zurich, for taking the time to read through multiple versions of the code, and for his tips on testing and improving code readability.
 - Jan Schüssler for his help with parallelisation and Python paths.
-- [Alan Greene](https://github.com/agreene01) for a helpful bug report.
 
 The paper in its current form would not be possible without the following papers, libraries, and datasets.
 
@@ -168,10 +165,15 @@ The paper in its current form would not be possible without the following papers
 - The function `create_annulus` in `data_handling.py` was borrowed from [pytorch-topological](https://github.com/aidos-lab/pytorch-topological/blob/main/torch_topological/data/shapes.py).
 
 
+In 2026, Sergio Serrano de Haro Iváñez optimized the code for ellipsoid intersections computations with the help of AI.
+
+We used AI to generate additional point clouds with bottlenecks and extend the dataset from [[3]](#3).
+
+
 # References
 
 <a id="1">[1]</a> 
-N.Canova, S. Kališnik, A. Moser, B. Rieck and A. Žegarac.
+S. Kališnik, B. Rieck and A. Žegarac.
 "Persistent Homology via Ellipsoids".
 
 <a id="2">[2]</a>
