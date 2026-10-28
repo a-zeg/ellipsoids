@@ -154,6 +154,7 @@ To run the classification experiments described in [[3]](#3), follow the instruc
 The last co-author of the paper [[1]](#1) would like to thank:
 - Marco Gähler for running the Code Review Days at ETH Zurich, for taking the time to read through multiple versions of the code, and for his tips on testing and improving code readability.
 - Jan Schüssler for his help with parallelisation and Python paths.
+- [Alan Greene](https://github.com/agreene01) for a helpful bug report.
 
 The paper in its current form would not be possible without the following papers, libraries, and datasets.
 
@@ -173,7 +174,7 @@ We used AI to generate additional point clouds with bottlenecks and extend the d
 # References
 
 <a id="1">[1]</a> 
-S. Kališnik, B. Rieck and A. Žegarac.
+N. Canova, S. Kališnik, A. Moser, B. Rieck and A. Žegarac.
 "Persistent Homology via Ellipsoids".
 
 <a id="2">[2]</a>
